@@ -13,28 +13,18 @@ Tile<int32_t> ProcessingElement::mpGEMM(
     
     Tile<int32_t> result(tile_size, tile_size);
     
-    for (size_t i = 0; i < tile_size; i++) {
-        for (size_t j = 0; j < tile_size; j++) {
-            int32_t acc = 0;
-            
-            for (size_t bit = 0; bit < num_bits; bit++) { // For Each Bit Plane
-                int32_t bit_plane_sum = 0;
-                for (size_t k = 0; k < tile_size; k++) {
-                    int16_t mask = -(weight_tiles[bit].at(k, j) & 1); // Create Bitmask
-                    bit_plane_sum += activation_tile.at(i, k) & mask; // Apply Mask to Activation Row
-                }   
-                acc += bit_plane_sum << bit; // Accumulate Bit Plane Results with Appropriate Shifts
+    for (size_t bit = 0; bit < num_bits; bit++) { // For Each Bit Plane
+        for (size_t i = 0; i < tile_size; i++) { // For Each Row in the Activation
+            for (size_t j = 0; j < tile_size; j++) { // For Each Column in the Weight
+                int32_t acc = 0;
+                for (size_t k = 0; k < tile_size; k++) { // Loop Over Weight Elements
+                    if (weight_tiles[bit].at(k, j) == 1) {
+                        acc += activation_tile.at(i, k);
+                    }
+                }
+                result.at(i, j) += acc << bit;
             }
-            result.at(i, j) = acc;
         }
-    }
-    
-    std::cout << "Result Matrix:" << std::endl;
-    for (size_t i = 0; i < tile_size; i++) {
-        for (size_t j = 0; j < tile_size; j++) {
-            std::cout << std::setw(8) << result.at(i, j) << " ";
-        }
-        std::cout << std::endl;
     }
     return result;
 }

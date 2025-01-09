@@ -73,7 +73,7 @@ void WeightMemory::loadWeights(const std::string& filename) {
                         if (linear_idx < bits_per_tile) {
                             size_t row = linear_idx / tile_size;
                             size_t col = linear_idx % tile_size;
-                            current_tile.at(row, col) = (packed_byte >> bit) & 1;
+                            current_tile.at(row, col) = (packed_byte >> (7 - bit)) & 1;
                         }
                     }
                 }

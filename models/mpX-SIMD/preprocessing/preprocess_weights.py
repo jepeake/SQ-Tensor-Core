@@ -12,13 +12,13 @@ def preprocess_weights(weights: np.ndarray, num_bits: int, tile_size: int) -> by
     Preprocess weight matrix into bit-serial tiled format for hardware
     Returns binary format that can be loaded by C++ hardware model
     """
-    print(
-    f"""
- _  _  ____  __  ___  _  _  ____    ____  ____  ____  ____  ____   __    ___  ____  ____  ____   __  ____ 
-/ )( \(  __)(  )/ __)/ )( \(_  _)  (  _ \(  _ \(  __)(  _ \(  _ \ /  \  / __)(  __)/ ___)/ ___) /  \(  _ \\
-\ /\ / ) _)  )(( (_ \) __ (  )(     ) __/ )   / ) _)  ) __/ )   /(  O )( (__  ) _) \___ \\___ \(  O ))   /
-(_/\_)(____)(__)\___/\_)(_/ (__)   (__)  (__\_)(____)(__)  (__\_) \__/  \___)(____)(____/(____/ \__/(__\_)
-    """)
+#     print(
+#     f"""
+#  _  _  ____  __  ___  _  _  ____    ____  ____  ____  ____  ____   __    ___  ____  ____  ____   __  ____ 
+# / )( \(  __)(  )/ __)/ )( \(_  _)  (  _ \(  _ \(  __)(  _ \(  _ \ /  \  / __)(  __)/ ___)/ ___) /  \(  _ \\
+# \ /\ / ) _)  )(( (_ \) __ (  )(     ) __/ )   / ) _)  ) __/ )   /(  O )( (__  ) _) \___ \\___ \(  O ))   /
+# (_/\_)(____)(__)\___/\_)(_/ (__)   (__)  (__\_)(____)(__)  (__\_) \__/  \___)(____)(____/(____/ \__/(__\_)
+#     """)
     rows, cols = weights.shape
     print("\nInput Weights Matrix:")
     print("-" * 40)
@@ -72,8 +72,3 @@ def preprocess_weights(weights: np.ndarray, num_bits: int, tile_size: int) -> by
     print(f"- Data Size: {packed_data.nbytes:,} bytes")
     
     return packed_data
-
-if __name__ == "__main__":
-    N = 4
-    weights = np.random.randint(0, 15, size=(N, N), dtype=np.int8)
-    bit_matrices = preprocess_weights(weights, num_bits=4, tile_size=4)

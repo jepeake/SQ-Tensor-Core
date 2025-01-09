@@ -36,7 +36,7 @@ Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations) {
     for (size_t tile_row = 0; tile_row < (matrix_rows + tile_size - 1) / tile_size; tile_row++) {
         for (size_t tile_col = 0; tile_col < num_act_tiles; tile_col++) {
             size_t tile_idx = tile_row * num_act_tiles + tile_col;
-            
+                        
             // Collect All Weight Tiles
             std::vector<Tile<uint8_t>> weight_tiles;
             for (size_t bit = 0; bit < weight_mem->getNumBits(); bit++) {
