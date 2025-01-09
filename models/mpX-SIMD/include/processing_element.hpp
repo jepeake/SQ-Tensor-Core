@@ -1,5 +1,7 @@
 #pragma once
 #include "tile.hpp"
+#include "weight_memory.hpp"
+#include <vector>
 
 namespace mpX {
 
@@ -9,8 +11,9 @@ private:
     
 public:
     explicit ProcessingElement(size_t ts);
-    Tile<int32_t> mpGEMM(const Tile<uint8_t>& weight_tile, 
-                         const Tile<int16_t>& activation_tile);
+    Tile<int32_t> mpGEMM(const std::vector<Tile<uint8_t>>& weight_tiles, 
+                         const Tile<int16_t>& activation_tile,
+                         size_t num_bits);
 };
 
 } // namespace mpX
