@@ -28,8 +28,15 @@ execute_process(
 )
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LLVM_CXXFLAGS}")
 
+set(SOURCES
+    src/core/weight_memory.cpp
+    src/core/processing_element.cpp
+    src/core/simd_engine.cpp
+    src/main.cpp
+)
+
 # Create Executable Target
-add_executable(mpX-SIMD src/hardware.cpp)
+add_executable(mpX-SIMD ${SOURCES})
 
 # Add Include Paths
 target_include_directories(mpX-SIMD PRIVATE 
