@@ -48,7 +48,7 @@ void WeightMemory::loadWeights(const std::string& filename) {
         
         // Calculate Bytes per Tile
         size_t bits_per_tile = tile_size * tile_size;
-        size_t bytes_per_tile = (bits_per_tile + 7) / 8; 
+        size_t bytes_per_tile = (bits_per_tile + 7) / 8;  // Round up to nearest byte
         
         std::vector<uint8_t> packed_tile(bytes_per_tile);
         
@@ -66,15 +66,13 @@ void WeightMemory::loadWeights(const std::string& filename) {
                 }
                 
                 // Unpack Bits into Tile
-                for (size_t byte_idx = 0; byte_idx < bytes_per_tile; byte_idx++) {
-                    uint8_t packed_byte = packed_tile[byte_idx];
-                    for (size_t bit = 0; bit < 8; bit++) {
-                        size_t linear_idx = byte_idx * 8 + bit;
-                        if (linear_idx < bits_per_tile) {
-                            size_t row = linear_idx / tile_size;
-                            size_t col = linear_idx % tile_size;
-                            current_tile.at(row, col) = (packed_byte >> (7 - bit)) & 1;
-                        }
+                size_t bit_position = 0;
+                for (size_t row = 0; row < tile_size; row++) {
+                    for (size_t col = 0; col < tile_size; col++) {
+                        size_t byte_idx = bit_position / 8;
+                        size_t bit_offset = 7 - (bit_position % 8);
+                        current_tile.at(row, col) = (packed_tile[byte_idx] >> bit_offset) & 1;
+                        bit_position++;
                     }
                 }
             }
