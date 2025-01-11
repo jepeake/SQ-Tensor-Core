@@ -20,18 +20,18 @@ def preprocess_weights(weights: np.ndarray, num_bits: int, tile_size: int) -> by
 # (_/\_)(____)(__)\___/\_)(_/ (__)   (__)  (__\_)(____)(__)  (__\_) \__/  \___)(____)(____/(____/ \__/(__\_)
 #     """)
     rows, cols = weights.shape
-    print("\nInput Weights Matrix:")
-    print("-" * 40)
-    print(weights)
-    print("-" * 40)
+    # print("\nInput Weights Matrix:")
+    # print("-" * 40)
+    # print(weights)
+    # print("-" * 40)
     
     num_row_tiles = (rows + tile_size - 1) // tile_size
     num_col_tiles = (cols + tile_size - 1) // tile_size
-    print(f"No. of Tiles: {num_row_tiles}x{num_col_tiles}")
+    # print(f"No. of Tiles: {num_row_tiles}x{num_col_tiles}")
     
     # Decompose into Bit Matrices
     bit_matrices = np.zeros((num_bits, num_row_tiles * num_col_tiles, tile_size, tile_size), dtype=np.uint8)
-    print(f"Bit Matrices Shape: {bit_matrices.shape}")
+    # print(f"Bit Matrices Shape: {bit_matrices.shape}")
     
     for bit in range(num_bits):
         tile_idx = 0
@@ -51,9 +51,9 @@ def preprocess_weights(weights: np.ndarray, num_bits: int, tile_size: int) -> by
                     bit_tile = padded
                     
                 bit_matrices[bit, tile_idx] = bit_tile
-                print(f"\nTile [{tile_row},{tile_col}]:")
-                print("-" * 20)
-                print(bit_tile)
+                # print(f"\nTile [{tile_row},{tile_col}]:")
+                # print("-" * 20)
+                # print(bit_tile)
                 tile_idx += 1
     
     # Pack into Binary Format
@@ -66,9 +66,9 @@ def preprocess_weights(weights: np.ndarray, num_bits: int, tile_size: int) -> by
         packed_data.tofile(f)
     
     file_size = os.path.getsize(output_file)
-    print(f"\nOutput File Stats:")
-    print(f"- File Size: {file_size:,} bytes")
-    print(f"- Header Size: {4 * 4} bytes")
-    print(f"- Data Size: {packed_data.nbytes:,} bytes")
+    # print(f"\nOutput File Stats:")
+    # print(f"- File Size: {file_size:,} bytes")
+    # print(f"- Header Size: {4 * 4} bytes")
+    # print(f"- Data Size: {packed_data.nbytes:,} bytes")
     
     return packed_data

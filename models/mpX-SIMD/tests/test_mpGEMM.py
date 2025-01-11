@@ -4,7 +4,7 @@ from preprocessing.preprocess_weights import preprocess_weights
 
 def test_mpGEMM():
     # Set dimensions
-    N = 4
+    N = 7
     
     # Generate random weights and activations
     weights = np.random.randint(0, 4, size=(N, N), dtype=np.int8)
