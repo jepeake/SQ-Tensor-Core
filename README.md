@@ -1,4 +1,4 @@
-# _mpX_
+# _smpGEMM_
 
 
 _This repo is a WIP for my Master's Thesis._
