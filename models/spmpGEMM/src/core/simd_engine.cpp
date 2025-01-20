@@ -4,10 +4,11 @@
 
 namespace spmpGEMM {
 
-SIMDEngine::SIMDEngine(const std::string& weight_file) {
+SIMDEngine::SIMDEngine(const std::string& weight_file, size_t num_processing_elements) 
+    : num_pes(num_processing_elements) {
     weight_mem = std::make_unique<WeightMemory>(weight_file);
     tile_size = weight_mem->getTileSize();
-    pe = std::make_unique<ProcessingElement>(tile_size);
+    pe_array = std::make_unique<PEArray>(num_pes, tile_size);
     matrix_rows = weight_mem->getNumRows();
     matrix_cols = weight_mem->getNumCols();
 }
@@ -72,44 +73,42 @@ Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations) {
         }
     }
 
-    // Process Tiles
+    // Process Tiles with Simulated Parallelism
     for (size_t tile_row = 0; tile_row < num_row_tiles; tile_row++) {
         for (size_t tile_col = 0; tile_col < num_col_tiles; tile_col++) {
-
             Tile<int32_t> acc_result(tile_size, tile_size);
-            for (size_t i = 0; i < tile_size; i++) {
-                for (size_t j = 0; j < tile_size; j++) {
-                    acc_result.at(i, j) = 0;
-                }
-            }
-
-            // For Each Tile in the Output Matrix
+            
+            // Prepare Tiles
+            std::vector<std::pair<std::vector<Tile<uint8_t>>, Tile<int16_t>>> tiles;
+            
             for (size_t k = 0; k < num_col_tiles; k++) {
-                // Get Activation Tile from Current Row
                 const auto& act_tile = activation_tiles[tile_row][k];
-                
-                // Get Corresponding Weight Tile from Column
                 size_t weight_tile_idx = k * num_col_tiles + tile_col;
                 
-                // Collect Weight Tiles
                 std::vector<Tile<uint8_t>> weight_tiles;
                 for (size_t bit = 0; bit < weight_mem->getNumBits(); bit++) {
                     weight_tiles.push_back(weight_mem->getTile(bit, weight_tile_idx));
                 }
                 
-                // Process mpGEMM for this Tile Pair
-                Tile<int32_t> tile_result = pe->mpGEMM(weight_tiles, act_tile, weight_mem->getNumBits());
-                
-                // Accumulate Results
+                tiles.emplace_back(weight_tiles, act_tile);
+            }
+            
+            // Process Tiles as if in Parallel
+            auto partial_results = pe_array->processTiles(
+                tiles, 
+                weight_mem->getNumBits()
+            );
+            
+            // Accumulate Results
+            for (const auto& partial : partial_results) {
                 for (size_t i = 0; i < tile_size; i++) {
                     for (size_t j = 0; j < tile_size; j++) {
-                        acc_result.at(i, j) += tile_result.at(i, j);
-                 
-                   }
+                        acc_result.at(i, j) += partial.at(i, j);
+                    }
                 }
             }
             
-            // Copy Accumulated Results to Final Position
+            // Copy to Final Result
             for (size_t i = 0; i < tile_size; i++) {
                 for (size_t j = 0; j < tile_size; j++) {
                     size_t global_row = tile_row * tile_size + i;
