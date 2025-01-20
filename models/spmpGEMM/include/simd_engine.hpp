@@ -16,7 +16,7 @@ private:
     
 public:
     explicit SIMDEngine(const std::string& weight_file, size_t num_processing_elements = 4);
-    Tile<int32_t> compute(const std::vector<int16_t>& activations);
+    Tile<int32_t> compute(const std::vector<int16_t>& activations, int16_t activation_threshold = 0);
 };
 
 } // namespace spmpGEMM

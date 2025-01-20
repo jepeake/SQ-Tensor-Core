@@ -23,7 +23,8 @@ public:
     // Process Tiles Sequentially. Organise Results as if Parallel.
     std::vector<Tile<int32_t>> processTiles(
         const std::vector<std::pair<std::vector<Tile<uint8_t>>, Tile<int16_t>>>& tiles,
-        size_t num_bits) {
+        size_t num_bits,
+        int16_t activation_threshold = 0) {
         
         std::vector<Tile<int32_t>> results;
         size_t total_tiles = tiles.size();
@@ -38,7 +39,8 @@ public:
                 auto result = pes[j]->mpGEMM(
                     work_item.first,
                     work_item.second,
-                    num_bits
+                    num_bits,
+                    activation_threshold
                 );
                 chunk_results.push_back(result);
             }

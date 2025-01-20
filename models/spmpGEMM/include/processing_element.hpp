@@ -13,7 +13,8 @@ public:
     explicit ProcessingElement(size_t ts);
     Tile<int32_t> mpGEMM(const std::vector<Tile<uint8_t>>& weight_tiles, 
                          const Tile<int16_t>& activation_tile,
-                         size_t num_bits);
+                         size_t num_bits,
+                         int16_t activation_threshold = 0);
 };
 
 } // namespace spmpGEMM

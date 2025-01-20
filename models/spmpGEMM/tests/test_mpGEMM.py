@@ -19,8 +19,9 @@ def test_mpGEMM():
     engine = SIMDEngine("weight_bits.bin")
     
     activations_flat = activations.flatten().tolist()
+    activation_threshold = 0  
     
-    result = engine.compute(activations_flat)
+    result = engine.compute(activations_flat, activation_threshold)
     
     result_array = np.array(result.data).reshape(N, N)
     print("\nResult Matrix:")

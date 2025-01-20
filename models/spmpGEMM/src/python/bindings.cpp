@@ -19,5 +19,7 @@ PYBIND11_MODULE(spmp_gemm, m) {
     // Bind the SIMDEngine 
     py::class_<spmpGEMM::SIMDEngine>(m, "SIMDEngine")
         .def(py::init<const std::string&>())
-        .def("compute", &spmpGEMM::SIMDEngine::compute);
+        .def("compute", &spmpGEMM::SIMDEngine::compute,
+             py::arg("activations"),
+             py::arg("activation_threshold") = 0);
 }

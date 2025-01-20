@@ -13,7 +13,7 @@ SIMDEngine::SIMDEngine(const std::string& weight_file, size_t num_processing_ele
     matrix_cols = weight_mem->getNumCols();
 }
 
-Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations) {
+Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16_t activation_threshold) {
     Tile<int32_t> result(matrix_rows, matrix_cols);
 
     std::vector<std::vector<Tile<int16_t>>> activation_tiles; 
@@ -96,7 +96,8 @@ Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations) {
             // Process Tiles as if in Parallel
             auto partial_results = pe_array->processTiles(
                 tiles, 
-                weight_mem->getNumBits()
+                weight_mem->getNumBits(),
+                activation_threshold
             );
             
             // Accumulate Results
