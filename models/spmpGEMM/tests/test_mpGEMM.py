@@ -5,16 +5,16 @@ from preprocessing.preprocess_weights import preprocess_weights
 def test_mpGEMM():
 
     # Test with Random Weights and Activations
-    N = 6
-    weights = np.random.randint(0, 4, size=(N, N), dtype=np.int8)
-    activations = np.random.randint(0, 4, size=(N, N), dtype=np.int8)
+    N = 128
+    weights = np.random.randint(0, 15, size=(N, N), dtype=np.int8)          # UINT4
+    activations = np.random.randint(-128, 127, size=(N, N), dtype=np.int32) # INT8
     
     print("\nWeight Matrix:")
     print(weights)
     print("\nActivation Matrix:")
     print(activations)
     
-    preprocess_weights(weights, num_bits=2, tile_size=3)
+    preprocess_weights(weights, num_bits=4, tile_size=4)
     
     engine = SIMDEngine("weight_bits.bin")
     
@@ -29,6 +29,8 @@ def test_mpGEMM():
     expected_result = np.matmul(activations, weights)    
     print("\nExpected Result (Software):")
     print(expected_result)
+
+    assert np.allclose(result_array, expected_result, atol=1e-2)
 
 if __name__ == "__main__":
     test_mpGEMM() 
