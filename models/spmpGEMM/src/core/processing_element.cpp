@@ -28,7 +28,7 @@ Tile<int32_t> ProcessingElement::mpGEMM(
                 
                 // Mask
                 // In Hardware, all masks occur in parallel across all weight-activation pairs, across all bit-planes
-                stats.masking_operations++;
+                stats.masking_operations = 1;
                 std::vector<int32_t> selected_activations(num_bits, 0);
                 for (size_t bit = 0; bit < num_bits; bit++) {
                     stats.total_mask_ops++;
@@ -39,7 +39,7 @@ Tile<int32_t> ProcessingElement::mpGEMM(
                 
                 // Shift
                 // In Hardware, all shifts occur in parallel (rewiring)
-                stats.shifting_operations++;
+                stats.shifting_operations = 1;
                 int32_t shifted_activation = 0;
                 for (size_t bit = 0; bit < num_bits; bit++) {
                     stats.total_shifts++;
