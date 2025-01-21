@@ -51,7 +51,7 @@ Tile<int32_t> ProcessingElement::mpGEMM(
                 size_t adders_needed = max_values_to_add - 1; // N-1 adders needed for N inputs
                 size_t adder_stages = static_cast<size_t>(std::ceil(std::log2(max_values_to_add))); // log2(N) stages
 
-                stats.total_additions += adders_needed; 
+                stats.total_additions = adders_needed * (tile_size * tile_size);
                 stats.addition_operations = adder_stages;
                 
                 // Add
