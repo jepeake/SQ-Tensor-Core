@@ -51,6 +51,14 @@ public:
         
         return results;
     }
+
+    std::vector<PEStats> getStats() const {
+        std::vector<PEStats> all_stats;
+        for (const auto& pe : pes) {
+            all_stats.push_back(pe->get_stats());
+        }
+        return all_stats;
+    }
 };
 
 } // namespace spmpGEMM 

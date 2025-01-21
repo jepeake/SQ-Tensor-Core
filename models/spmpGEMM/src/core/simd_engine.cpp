@@ -14,6 +14,9 @@ SIMDEngine::SIMDEngine(const std::string& weight_file, size_t num_processing_ele
 }
 
 Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16_t activation_threshold) {
+    // Clear previous stats
+    system_stats.clear();
+    
     Tile<int32_t> result(matrix_rows, matrix_cols);
 
     std::vector<std::vector<Tile<int16_t>>> activation_tiles; 
@@ -122,6 +125,9 @@ Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16
             }
         }
     }
+    
+    // After processing tiles, collect stats
+    system_stats.pe_stats = pe_array->getStats();
     
     return result;
 }

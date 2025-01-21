@@ -1,5 +1,6 @@
 #pragma once
 #include <cstddef>
+#include <vector>
 
 namespace spmpGEMM {
 
@@ -24,6 +25,16 @@ struct PEStats {
         total_mask_ops = 0;
         total_shifts = 0;
         total_additions = 0;
+    }
+};
+
+struct SystemStats {
+    std::vector<PEStats> pe_stats;
+    
+    void clear() {
+        for (auto& stats : pe_stats) {
+            stats.clear();
+        }
     }
 };
 
