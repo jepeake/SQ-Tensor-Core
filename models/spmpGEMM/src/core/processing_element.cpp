@@ -4,7 +4,9 @@
 
 namespace spmpGEMM {
 
-ProcessingElement::ProcessingElement(size_t ts) : tile_size(ts) {}
+ProcessingElement::ProcessingElement(size_t ts) : tile_size(ts) {
+    stats.clear();
+}
 
 Tile<int32_t> ProcessingElement::mpGEMM(
     const std::vector<Tile<uint8_t>>& weight_tiles,
@@ -18,31 +20,52 @@ Tile<int32_t> ProcessingElement::mpGEMM(
         for (size_t j = 0; j < tile_size; j++) {
             int32_t final_acc = 0;
             for (size_t k = 0; k < tile_size; k++) {
+
                 // Check Activation Sparsity
                 if (std::abs(activation_tile.at(i, k)) <= activation_threshold) {
                     continue;  // Skip Computation for Sparse Activations
                 }
                 
                 // Mask
-                std::vector<int32_t> masked_values(num_bits, 0);
+                // In Hardware, all masks occur in parallel across all weight-activation pairs, across all bit-planes
+                stats.masking_operations++;
+                std::vector<int32_t> selected_activations(num_bits, 0);
                 for (size_t bit = 0; bit < num_bits; bit++) {
+                    stats.total_mask_ops++;
                     if (weight_tiles[bit].at(k, j) == 1) {
-                        masked_values[bit] = activation_tile.at(i, k);
+                        selected_activations[bit] = activation_tile.at(i, k);
                     }
                 }
                 
                 // Shift
+                // In Hardware, all shifts occur in parallel (rewiring)
+                stats.shifting_operations++;
                 int32_t shifted_activation = 0;
                 for (size_t bit = 0; bit < num_bits; bit++) {
-                    shifted_activation += (masked_values[bit] << bit);
+                    stats.total_shifts++;
+                    shifted_activation += (selected_activations[bit] << bit);
                 }
+
+                // Adder Tree Stats
+                size_t max_values_to_add = tile_size * num_bits; 
+                size_t adders_needed = max_values_to_add - 1; // N-1 adders needed for N inputs
+                size_t adder_stages = static_cast<size_t>(std::ceil(std::log2(max_values_to_add))); // log2(N) stages
+
+                stats.total_additions += adders_needed; 
+                stats.addition_operations = adder_stages;
                 
                 // Add
                 final_acc += shifted_activation;
+                
             }
             result.at(i, j) = final_acc;
         }
     }
+
+    stats.total_cycles = stats.masking_operations + 
+                        stats.shifting_operations + 
+                        stats.addition_operations;
+
     return result;
 }
 
