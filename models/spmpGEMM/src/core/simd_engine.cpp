@@ -57,7 +57,8 @@ Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16
             }
             activation_tiles[tile_row][tile_col] = tile;
 
-            // --- Printing ---
+
+            // ----- Printing -----
             std::cout << "\nActivation Tile [" << tile_row << "," << tile_col << "]:" << std::endl;
             std::cout << "--------------------" << std::endl;
             for (size_t i = 0; i < tile_size; i++) {
@@ -79,7 +80,7 @@ Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16
                     std::cout << std::endl;
                 }
             }
-            // --- End Printing ---
+            // ----- End Printing -----
         }
     }
 
@@ -106,7 +107,7 @@ Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16
 
 
     // ----- Parallel PE Processing -----
-            
+             
     // Process Tiles as if in Parallel
     auto partial_results = pe_array->processTiles(
         tiles, 
@@ -118,24 +119,27 @@ Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16
     // ----- Row-Wise Adder Tree -----
     
     // Each Row of Tiles Sums in Parallel
+
+    // For Each Position in Result Matrix
     for (size_t tile_row = 0; tile_row < num_row_tiles; tile_row++) { 
         for (size_t local_row = 0; local_row < tile_size; local_row++) { 
-            for (size_t global_col = 0; global_col < num_col_tiles * tile_size; global_col++) {
-                size_t global_row = tile_row * tile_size + local_row;
-                if (global_row >= matrix_rows) continue;
+            for (size_t global_col = 0; global_col < num_col_tiles * tile_size; global_col++) { 
 
+                // Find Position
+                size_t global_row = tile_row * tile_size + local_row; 
+                if (global_row >= matrix_rows) continue;                                         
                 size_t tile_col = global_col / tile_size;
-                size_t local_col = global_col % tile_size;
+                size_t local_col = global_col % tile_size; 
                 
-                // All Partial Products for This Position are Summed Through an Adder Tree
-                // In Hardware, this would happen in log(N) Stages where N is num_col_tiles
+                // Accumulate Partial Products
                 int32_t sum = 0;
                 size_t base_idx = (tile_row * num_col_tiles + tile_col) * num_col_tiles;
-                
                 for (size_t k = 0; k < num_col_tiles; k++) {
-                    sum += partial_results[base_idx + k].at(local_row, local_col);
+                    sum += partial_results[base_idx + k].at(local_row, local_col); 
                 }
-                result.at(global_row, global_col) = sum;
+
+                // Store Result 
+                result.at(global_row, global_col) = sum; 
             }
         }
     }
