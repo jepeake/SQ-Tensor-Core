@@ -29,7 +29,11 @@ PYBIND11_MODULE(spmp_gemm, m) {
 
     // Bind the SystemStats
     py::class_<spmpGEMM::SystemStats>(m, "SystemStats")
-        .def_readonly("pe_stats", &spmpGEMM::SystemStats::pe_stats);
+        .def_readonly("pe_stats", &spmpGEMM::SystemStats::pe_stats)
+        .def_readonly("total_parallel_cycles", &spmpGEMM::SystemStats::total_parallel_cycles)
+        .def_readonly("total_parallel_mask_ops", &spmpGEMM::SystemStats::total_parallel_mask_ops)
+        .def_readonly("total_parallel_shifts", &spmpGEMM::SystemStats::total_parallel_shifts)
+        .def_readonly("total_parallel_additions", &spmpGEMM::SystemStats::total_parallel_additions);
 
     // Bind the SIMDEngine 
     py::class_<spmpGEMM::SIMDEngine>(m, "SIMDEngine")

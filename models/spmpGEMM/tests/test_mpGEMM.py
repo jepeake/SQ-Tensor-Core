@@ -35,6 +35,8 @@ def test_mpGEMM():
     print("\nHardware Statistics:")
     print("-------------------")
     stats = engine.get_stats()
+    
+    # Per-PE Statistics
     for i, pe_stat in enumerate(stats.pe_stats):
         print(f"\nProcessing Element {i}:")
         print(f"  Total Cycles: {pe_stat.total_cycles}")
@@ -46,6 +48,14 @@ def test_mpGEMM():
         print(f"    - Mask Ops: {pe_stat.total_mask_ops}")
         print(f"    - Shifts: {pe_stat.total_shifts}")
         print(f"    - Additions: {pe_stat.total_additions}")
+    
+    # System-wide Statistics
+    print("\nSystem-wide Statistics (Parallel Execution):")
+    print(f"  Total Parallel Cycles: {stats.total_parallel_cycles}")
+    print(f"  Total Parallel Operations:")
+    print(f"    - Mask Ops: {stats.total_parallel_mask_ops}")
+    print(f"    - Shifts: {stats.total_parallel_shifts}")
+    print(f"    - Additions: {stats.total_parallel_additions}")
 
     assert np.allclose(result_array, expected_result, atol=1e-2)
 

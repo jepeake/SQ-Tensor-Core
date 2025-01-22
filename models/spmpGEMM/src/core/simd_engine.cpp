@@ -152,6 +152,7 @@ Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16
     }
 
     system_stats.pe_stats = pe_array->getStats();
+    system_stats.calculateSystemStats();
     
     return result;
 }
