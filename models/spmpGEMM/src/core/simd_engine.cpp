@@ -83,52 +83,10 @@ Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16
         }
     }
 
-    // for (size_t i = 0; i < total_tiles; i++) {
 
-    //     Tile<int32_t> acc_result(tile_size, tile_size);
-    
-    //     std::vector<std::pair<std::vector<Tile<uint8_t>>, Tile<int16_t>>> tiles;
-    //     std::vector<Tile<uint8_t>> weight_tiles;
-
-    //     const auto& act_tile = activation_tiles[i / num_col_tiles][i % num_col_tiles];
-    //     size_t weight_tile_idx = i % num_col_tiles;
-
-    //     for (size_t bit = 0; bit < weight_mem->getNumBits(); bit++) {
-    //         weight_tiles.push_back(weight_mem->getTile(bit, weight_tile_idx));
-    //     }
-
-    //     tiles.emplace_back(weight_tiles, act_tile); 
-
-    //     // Process Tiles as if in Parallel
-    //     auto partial_results = pe_array->processTiles(
-    //         tiles, 
-    //         weight_mem->getNumBits(),
-    //         activation_threshold
-    //     );
-
-    //     for (const auto& partial : partial_results) {
-    //         for (size_t i = 0; i < tile_size; i++) {
-    //             for (size_t j = 0; j < tile_size; j++) {
-    //                 result.at(i, j) += partial.at(i, j);
-    //             }
-    //         }
-    //     }
-
-    //     // Copy to Final Result
-    //     for (size_t i = 0; i < tile_size; i++) {
-    //         for (size_t j = 0; j < tile_size; j++) {
-    //             size_t global_row = i * tile_size + i;
-    //             size_t global_col = j * tile_size + j;
-    //             if (global_row < matrix_rows && global_col < matrix_cols) {
-    //                 result.at(global_row, global_col) = acc_result.at(i, j);
-    //             }
-    //         }
-    //     }
-    // }
+    // ----- Get Tile Pairs for Each PE -----
 
     std::vector<std::pair<std::vector<Tile<uint8_t>>, Tile<int16_t>>> tiles;
-
-    // Get Tiles for Each PE
     for (size_t tile_row = 0; tile_row < num_row_tiles; tile_row++) {
         for (size_t tile_col = 0; tile_col < num_col_tiles; tile_col++) {
             
@@ -145,6 +103,9 @@ Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16
             }
         }
     }
+
+
+    // ----- Parallel PE Processing -----
             
     // Process Tiles as if in Parallel
     auto partial_results = pe_array->processTiles(
