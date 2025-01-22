@@ -153,15 +153,13 @@ Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16
         activation_threshold
     );
     
-    // Process Results by Simulating Parallel Adder Trees per Row of PEs
-    const size_t row_limit = std::min(matrix_rows, num_row_tiles * tile_size);
-    const size_t col_limit = std::min(matrix_cols, num_col_tiles * tile_size);
+
+    // ----- Row-Wise Adder Tree -----
     
-    // Each Row of Tiles Processes in Parallel
-    #pragma omp parallel for collapse(3) schedule(static)
-    for (size_t tile_row = 0; tile_row < num_row_tiles; tile_row++) {
-        for (size_t local_row = 0; local_row < tile_size; local_row++) {
-            for (size_t global_col = 0; global_col < col_limit; global_col++) {
+    // Each Row of Tiles Sums in Parallel
+    for (size_t tile_row = 0; tile_row < num_row_tiles; tile_row++) { 
+        for (size_t local_row = 0; local_row < tile_size; local_row++) { 
+            for (size_t global_col = 0; global_col < num_col_tiles * tile_size; global_col++) {
                 size_t global_row = tile_row * tile_size + local_row;
                 if (global_row >= matrix_rows) continue;
 
@@ -173,7 +171,6 @@ Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16
                 int32_t sum = 0;
                 size_t base_idx = (tile_row * num_col_tiles + tile_col) * num_col_tiles;
                 
-                #pragma omp simd reduction(+:sum)
                 for (size_t k = 0; k < num_col_tiles; k++) {
                     sum += partial_results[base_idx + k].at(local_row, local_col);
                 }

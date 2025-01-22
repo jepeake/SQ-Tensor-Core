@@ -28,27 +28,23 @@ public:
         
         std::vector<Tile<int32_t>> results;
         size_t total_tiles = tiles.size();
-        
-        for (size_t i = 0; i < total_tiles; i += num_pes) {
-            size_t chunk_size = std::min(num_pes, total_tiles - i);
-            std::vector<Tile<int32_t>> chunk_results;
-            
-            // Process Each Tile Sequentially
-            for (size_t j = 0; j < chunk_size; j++) {
-                const auto& work_item = tiles[i + j];
-                auto result = pes[j]->mpGEMM(
-                    work_item.first,
-                    work_item.second,
-                    num_bits,
-                    activation_threshold
-                );
-                chunk_results.push_back(result);
-            }
-            
-            // Collect Results as if Computed in Parallel
-            results.insert(results.end(), chunk_results.begin(), chunk_results.end());
+
+        if (total_tiles > num_pes) {
+            throw std::runtime_error("Not Enough PEs for All Tiles");
         }
         
+        // Process All Tiles in Parallel Using Separate PEs
+        for (size_t i = 0; i < total_tiles; i++) {
+            const auto& work_item = tiles[i];
+            auto result = pes[i]->mpGEMM(
+                work_item.first,
+                work_item.second, 
+                num_bits,
+                activation_threshold
+            );
+            results.push_back(result);
+        }
+
         return results;
     }
 
