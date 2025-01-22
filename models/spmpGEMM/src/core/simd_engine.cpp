@@ -6,15 +6,17 @@ namespace spmpGEMM {
 
 SIMDEngine::SIMDEngine(const std::string& weight_file, size_t num_processing_elements) 
     : num_pes(num_processing_elements) {
+
     weight_mem = std::make_unique<WeightMemory>(weight_file);
     tile_size = weight_mem->getTileSize();
-    pe_array = std::make_unique<PEArray>(num_pes, tile_size);
     matrix_rows = weight_mem->getNumRows();
     matrix_cols = weight_mem->getNumCols();
+
+    pe_array = std::make_unique<PEArray>(num_pes, tile_size);
 }
 
 Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16_t activation_threshold) {
-    // Clear previous stats
+
     system_stats.clear();
     
     Tile<int32_t> result(matrix_rows, matrix_cols);
@@ -22,7 +24,12 @@ Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16
     std::vector<std::vector<Tile<int16_t>>> activation_tiles; 
     size_t num_row_tiles = (matrix_rows + tile_size - 1) / tile_size;
     size_t num_col_tiles = (matrix_cols + tile_size - 1) / tile_size;
-    
+    std::cout << "Number of Row Tiles: " << num_row_tiles << std::endl;
+    std::cout << "Number of Col Tiles: " << num_col_tiles << std::endl;
+
+    size_t total_tiles = num_row_tiles * num_col_tiles;
+    std::cout << "Total Tiles: " << total_tiles << std::endl;
+
     // Initialise 2D Vector of Tiles
     activation_tiles.resize(num_row_tiles);
     for (auto& row : activation_tiles) {
@@ -76,13 +83,54 @@ Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16
         }
     }
 
-    // Process Tiles with Simulated Parallelism
+    // for (size_t i = 0; i < total_tiles; i++) {
+
+    //     Tile<int32_t> acc_result(tile_size, tile_size);
+    
+    //     std::vector<std::pair<std::vector<Tile<uint8_t>>, Tile<int16_t>>> tiles;
+    //     std::vector<Tile<uint8_t>> weight_tiles;
+
+    //     const auto& act_tile = activation_tiles[i / num_col_tiles][i % num_col_tiles];
+    //     size_t weight_tile_idx = i % num_col_tiles;
+
+    //     for (size_t bit = 0; bit < weight_mem->getNumBits(); bit++) {
+    //         weight_tiles.push_back(weight_mem->getTile(bit, weight_tile_idx));
+    //     }
+
+    //     tiles.emplace_back(weight_tiles, act_tile); 
+
+    //     // Process Tiles as if in Parallel
+    //     auto partial_results = pe_array->processTiles(
+    //         tiles, 
+    //         weight_mem->getNumBits(),
+    //         activation_threshold
+    //     );
+
+    //     for (const auto& partial : partial_results) {
+    //         for (size_t i = 0; i < tile_size; i++) {
+    //             for (size_t j = 0; j < tile_size; j++) {
+    //                 result.at(i, j) += partial.at(i, j);
+    //             }
+    //         }
+    //     }
+
+    //     // Copy to Final Result
+    //     for (size_t i = 0; i < tile_size; i++) {
+    //         for (size_t j = 0; j < tile_size; j++) {
+    //             size_t global_row = i * tile_size + i;
+    //             size_t global_col = j * tile_size + j;
+    //             if (global_row < matrix_rows && global_col < matrix_cols) {
+    //                 result.at(global_row, global_col) = acc_result.at(i, j);
+    //             }
+    //         }
+    //     }
+    // }
+
+    std::vector<std::pair<std::vector<Tile<uint8_t>>, Tile<int16_t>>> tiles;
+
+    // Get Tiles for Each PE
     for (size_t tile_row = 0; tile_row < num_row_tiles; tile_row++) {
         for (size_t tile_col = 0; tile_col < num_col_tiles; tile_col++) {
-            Tile<int32_t> acc_result(tile_size, tile_size);
-            
-            // Prepare Tiles
-            std::vector<std::pair<std::vector<Tile<uint8_t>>, Tile<int16_t>>> tiles;
             
             for (size_t k = 0; k < num_col_tiles; k++) {
                 const auto& act_tile = activation_tiles[tile_row][k];
@@ -95,38 +143,45 @@ Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16
                 
                 tiles.emplace_back(weight_tiles, act_tile);
             }
+        }
+    }
             
-            // Process Tiles as if in Parallel
-            auto partial_results = pe_array->processTiles(
-                tiles, 
-                weight_mem->getNumBits(),
-                activation_threshold
-            );
-            
-            // Accumulate Results
-            for (const auto& partial : partial_results) {
-                for (size_t i = 0; i < tile_size; i++) {
-                    for (size_t j = 0; j < tile_size; j++) {
-                        acc_result.at(i, j) += partial.at(i, j);
-                    }
+    // Process Tiles as if in Parallel
+    auto partial_results = pe_array->processTiles(
+        tiles, 
+        weight_mem->getNumBits(),
+        activation_threshold
+    );
+    
+    // Process Results by Simulating Parallel Adder Trees per Row of PEs
+    const size_t row_limit = std::min(matrix_rows, num_row_tiles * tile_size);
+    const size_t col_limit = std::min(matrix_cols, num_col_tiles * tile_size);
+    
+    // Each Row of Tiles Processes in Parallel
+    #pragma omp parallel for collapse(3) schedule(static)
+    for (size_t tile_row = 0; tile_row < num_row_tiles; tile_row++) {
+        for (size_t local_row = 0; local_row < tile_size; local_row++) {
+            for (size_t global_col = 0; global_col < col_limit; global_col++) {
+                size_t global_row = tile_row * tile_size + local_row;
+                if (global_row >= matrix_rows) continue;
+
+                size_t tile_col = global_col / tile_size;
+                size_t local_col = global_col % tile_size;
+                
+                // All Partial Products for This Position are Summed Through an Adder Tree
+                // In Hardware, this would happen in log(N) Stages where N is num_col_tiles
+                int32_t sum = 0;
+                size_t base_idx = (tile_row * num_col_tiles + tile_col) * num_col_tiles;
+                
+                #pragma omp simd reduction(+:sum)
+                for (size_t k = 0; k < num_col_tiles; k++) {
+                    sum += partial_results[base_idx + k].at(local_row, local_col);
                 }
-            }
-            
-            // Copy to Final Result
-            for (size_t i = 0; i < tile_size; i++) {
-                for (size_t j = 0; j < tile_size; j++) {
-                    size_t global_row = tile_row * tile_size + i;
-                    size_t global_col = tile_col * tile_size + j;
-                    
-                    if (global_row < matrix_rows && global_col < matrix_cols) {
-                        result.at(global_row, global_col) = acc_result.at(i, j);
-                    }
-                }
+                result.at(global_row, global_col) = sum;
             }
         }
     }
-    
-    // After processing tiles, collect stats
+
     system_stats.pe_stats = pe_array->getStats();
     
     return result;

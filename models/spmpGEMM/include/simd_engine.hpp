@@ -16,7 +16,7 @@ private:
     SystemStats system_stats;
     
 public:
-    explicit SIMDEngine(const std::string& weight_file, size_t num_processing_elements = 4);
+    explicit SIMDEngine(const std::string& weight_file, size_t num_processing_elements = 16);
     Tile<int32_t> compute(const std::vector<int16_t>& activations, int16_t activation_threshold = 0);
     const SystemStats& getStats() const { return system_stats; }
 };

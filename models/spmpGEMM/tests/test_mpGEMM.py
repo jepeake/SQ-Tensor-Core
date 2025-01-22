@@ -5,7 +5,7 @@ from preprocessing.preprocess_weights import preprocess_weights
 def test_mpGEMM():
 
     # Test with Random Weights and Activations
-    N = 4
+    N = 8
     weights = np.random.randint(0, 15, size=(N, N), dtype=np.int8)          # UINT4
     activations = np.random.randint(-128, 127, size=(N, N), dtype=np.int32) # INT8
     
