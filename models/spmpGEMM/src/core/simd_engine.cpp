@@ -1,16 +1,23 @@
 #include "../include/simd_engine.hpp"
 #include <iostream>
 #include <iomanip>
+#include <cmath>
 
 namespace spmpGEMM {
 
-SIMDEngine::SIMDEngine(const std::string& weight_file, size_t num_processing_elements) 
-    : num_pes(num_processing_elements) {
-
+SIMDEngine::SIMDEngine(const std::string& weight_file) {
     weight_mem = std::make_unique<WeightMemory>(weight_file);
     tile_size = weight_mem->getTileSize();
     matrix_rows = weight_mem->getNumRows();
     matrix_cols = weight_mem->getNumCols();
+
+    // No. Tiles in Each Dimension
+    size_t num_tiles_dim = (matrix_rows + tile_size - 1) / tile_size;
+    
+    // Number of PEs needed is (N/M)^3 where:
+    // N is the matrix dimension (assuming square matrices)
+    // M is the tile dimension
+    num_pes = num_tiles_dim * num_tiles_dim * num_tiles_dim;
 
     pe_array = std::make_unique<PEArray>(num_pes, tile_size);
 }
