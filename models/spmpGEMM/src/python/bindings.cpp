@@ -41,5 +41,9 @@ PYBIND11_MODULE(spmp_gemm, m) {
         .def("compute", &spmpGEMM::SIMDEngine::compute,
              py::arg("activations"),
              py::arg("activation_threshold") = 0)
-        .def("get_stats", &spmpGEMM::SIMDEngine::getStats);
+        .def("get_stats", &spmpGEMM::SIMDEngine::getStats)
+        .def("get_matrix_rows", &spmpGEMM::SIMDEngine::getMatrixRows)
+        .def("get_matrix_cols", &spmpGEMM::SIMDEngine::getMatrixCols)
+        .def("get_tile_size", &spmpGEMM::SIMDEngine::getTileSize)
+        .def("get_num_pes", &spmpGEMM::SIMDEngine::getNumPEs);
 }

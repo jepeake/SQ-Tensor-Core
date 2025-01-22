@@ -19,6 +19,11 @@ public:
     explicit SIMDEngine(const std::string& weight_file);
     Tile<int32_t> compute(const std::vector<int16_t>& activations, int16_t activation_threshold = 0);
     const SystemStats& getStats() const { return system_stats; }
+    
+    size_t getMatrixRows() const { return matrix_rows; }
+    size_t getMatrixCols() const { return matrix_cols; }
+    size_t getTileSize() const { return tile_size; }
+    size_t getNumPEs() const { return num_pes; }
 };
 
 } // namespace spmpGEMM
