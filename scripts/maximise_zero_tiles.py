@@ -1,12 +1,12 @@
 import random, math
 
 PARAMS = {
-    'MATRIX_SIZE': 100,          
+    'MATRIX_SIZE': 200,          
     'ZERO_PROBABILITY': 0.5,     
     'RANDOM_SEED': 42,           
     
     # Simulated Annealing
-    'MAX_ITERATIONS': 10000,     
+    'MAX_ITERATIONS': 500000,     
     'START_TEMP': 100.0,       
     'COOLING_RATE': 0.99,        
     'MIN_TEMP': 1e-3,          
@@ -69,14 +69,34 @@ def simulated_annealing(matrix, init_order, max_iters=None, start_temp=None, coo
     row_4win = find_starting_positions(matrix)
     current_order, current_val = init_order[:], total_zero_tiles(row_4win, init_order)
     best_order, best_val = current_order[:], current_val
+    
     T = start_temp
-    for _ in range(max_iters):
+    no_improve = 0
+    
+    for iter in range(max_iters):
         new_ord, affected = random_move(current_order)
         diff = delta_zero_tiles(row_4win, current_order, new_ord, current_val, affected)
+        
+        # Accept Move Based on Improvement or Probability
         if (new_val := current_val + diff) > current_val or random.random() < math.exp(diff/T):
             current_order, current_val = new_ord, new_val
-            if new_val > best_val: best_val, best_order = new_val, current_order[:]
-        T = max(T*cooling_rate, PARAMS['MIN_TEMP'])
+            if new_val > best_val:
+                best_val, best_order = new_val, current_order[:]
+                no_improve = 0
+            else:
+                no_improve += 1
+        else:
+            no_improve += 1
+            
+        # Adaptive Cooling - Slow Down Cooling if We're Not Improving
+        cooling_factor = cooling_rate * (1.0 + (no_improve / 1000))  # Slow Cooling if Stuck
+        T = max(T * min(cooling_factor, 0.999), PARAMS['MIN_TEMP'])
+        
+        # Reset Temperature if Stuck for Too Long
+        if no_improve > 5000:
+            T = start_temp * 0.5
+            no_improve = 0
+            
     return best_order
 
 # Wrapper Function to Initialise and Run Simulated Annealing
