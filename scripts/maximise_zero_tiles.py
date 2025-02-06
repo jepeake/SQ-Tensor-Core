@@ -101,7 +101,6 @@ def simulated_annealing(matrix, init_order, max_iters=None, start_temp=None, coo
         new_ord, affected = random_move(current_order)
         diff = delta_zero_tiles(row_win, current_order, new_ord, current_val, affected)
         
-        # Accept move based on improvement or probabilistic criteria
         if (new_val := current_val + diff) > current_val or random.random() < math.exp(diff / T):
             current_order, current_val = new_ord, new_val
             if new_val > best_val:
@@ -149,7 +148,28 @@ def print_matrix(matrix, row_order=None):
             for j, x in enumerate(matrix[r])
         ))
 
-# Test the Optimisation Pipeline adapted for 2x2 blocks
+def induce_zeros(matrix, row_order=None):
+    if not matrix:
+        return 0
+    if row_order is None:
+        row_order = list(range(len(matrix)))
+    tile_size = PARAMS['TILE_SIZE']
+    M = len(matrix)
+    N = len(matrix[0])
+    flip_count = 0
+    
+    # Iterate over Disjoint Tiles
+    for i in range(0, M - tile_size + 1, tile_size):
+        for j in range(0, N - tile_size + 1, tile_size):
+            block_coords = [(row_order[i + x], j + y) for x in range(tile_size) for y in range(tile_size)]
+            one_positions = [(r, c) for (r, c) in block_coords if matrix[r][c] == 1]
+            # If Tile has a Single 1 - Flip to Zero Tile
+            if len(one_positions) == 1:
+                r, c = one_positions[0]
+                matrix[r][c] = 0
+                flip_count += 1
+    return flip_count
+
 def test_pipeline():
     matrix = generate_random_matrix(
         PARAMS['MATRIX_SIZE'], 
@@ -157,17 +177,34 @@ def test_pipeline():
         PARAMS['ZERO_PROBABILITY'], 
         PARAMS['RANDOM_SEED']
     )
-    print("Original matrix:")
+    print("Original Matrix:")
     print_matrix(matrix)
     print("\n" + "="*50 + "\n")
+    
     before_val = count_zero_tiles(matrix)
     best_order = reorder(matrix)
-    print("Reordered matrix:")
+
+    print("Reordered Matrix:")
     print_matrix(matrix, best_order)
+    val_after_reorder = count_zero_tiles(matrix, best_order)
+    
     print("\n" + "="*50 + "\n")
-    after_val = count_zero_tiles(matrix, best_order)
+    ones_before = sum(cell == 1 for row in matrix for cell in row)
+    flipped = induce_zeros(matrix, best_order)
+    percentage_flipped = (flipped / ones_before * 100) if ones_before else 0.0
+    
+    print("Matrix with Induced Zero Tiles:")
+    print_matrix(matrix, best_order)
+    val_after_seq = count_zero_tiles(matrix, best_order)
+    
+    print("\n" + "="*50 + "\n")
     print(
-        f"2x2 blocks BEFORE: {before_val}\n2x2 blocks AFTER:  {after_val}\nImprovement: +{after_val - before_val}"
+        f"2x2 Blocks BEFORE:            {before_val}\n"
+        f"2x2 Blocks AFTER Reordering:  {val_after_reorder}\n"
+        f"2x2 Blocks AFTER Flipping:  {val_after_seq}\n"
+        f"Total Improvement:            +{val_after_seq - before_val}\n"
+        f"Bits Set to Zero:            {flipped} "
+        f"({percentage_flipped:.2f}% of Ones)"
     )
 
 if __name__ == "__main__":
