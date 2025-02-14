@@ -3,6 +3,9 @@ from panda import SIMDEngine
 from preprocessing.preprocess_weights import preprocess_weights
 from typing import List, Dict
 import textwrap
+import os
+import contextlib
+import sys
 
 
 # ----- Pretty Printing -----
@@ -111,52 +114,85 @@ def print_system_stats(stats, indent: int = 0):
 
 # ----- Test -----
 
-def test_mpGEMM():
-    N = 8
-    TILE_SIZE = 4
-    NUM_BITS = 4
-    
-    weights = np.random.randint(0, 15, size=(N, N), dtype=np.int8)
-    activations = np.random.randint(-128, 127, size=(N, N), dtype=np.int32)
-    
-    print("\nInput Matrices")
-    print("═" * 50)
-    print_matrix("Weight Matrix", weights)
-    print_matrix("Activation Matrix", activations)
-    
-    preprocess_weights(weights, num_bits=NUM_BITS, tile_size=TILE_SIZE)
-    
+@contextlib.contextmanager
+def suppress_all_output():
+    """
+    Suppress stdout and stderr (including output from C++ code) by redirecting
+    the underlying file descriptors to os.devnull.
+    """
+    with open(os.devnull, 'w') as devnull:
+        old_stdout_fd = os.dup(1)
+        old_stderr_fd = os.dup(2)
+        try:
+            os.dup2(devnull.fileno(), 1)
+            os.dup2(devnull.fileno(), 2)
+            yield
+        finally:
+            os.dup2(old_stdout_fd, 1)
+            os.dup2(old_stderr_fd, 2)
+            os.close(old_stdout_fd)
+            os.close(old_stderr_fd)
+
+def run_matmul_test(matrix_size, tile_size, num_bits, activation_threshold=0, verbose=True):
+    """
+    Runs a hardware matrix multiplication test.
+    Prints detailed output (including input matrices, matrix info,
+    computation results, processing element stats, and system-wide stats)
+    in the same style as the old test_matmul function.
+    """
+    weights = np.random.randint(0, 15, size=(matrix_size, matrix_size), dtype=np.int8)
+    activations = np.random.randint(-128, 127, size=(matrix_size, matrix_size), dtype=np.int32)
+
+    if verbose:
+        print("\nInput Matrices")
+        print("═" * 50)
+        print_matrix("Weight Matrix", weights)
+        print_matrix("Activation Matrix", activations)
+
+    preprocess_weights(weights, num_bits=num_bits, tile_size=tile_size)
+
     engine = SIMDEngine("weight_bits.bin")
-    
-    print_matrix_info(engine)
-    
-    result = engine.compute(activations.flatten().tolist(), activation_threshold=0)
-    result_array = np.array(result.data).reshape(N, N)
-    
-    print("\nComputation Results")
-    print("═" * 50)
-    print_matrix("Hardware Result", result_array)
-    print_matrix("Software Reference", np.matmul(activations, weights))
-    
+
+    if verbose:
+        print_matrix_info(engine)
+
+    if verbose:
+        result_tile = engine.compute(activations.flatten().tolist(), activation_threshold)
+    else:
+        with suppress_all_output():
+            result_tile = engine.compute(activations.flatten().tolist(), activation_threshold)
+
+    result_array = np.array(result_tile.data).reshape(matrix_size, matrix_size)
+    software_reference = np.matmul(activations, weights)
+
     stats = engine.get_stats()
-    
-    print("\nProcessing Element Stats")
-    print("═" * 50)
-    
-    num_row_tiles = (N + TILE_SIZE - 1) // TILE_SIZE
-    num_col_tiles = (N + TILE_SIZE - 1) // TILE_SIZE
-    
-    pe_idx = 0
-    for tile_row in range(num_row_tiles):
-        for tile_col in range(num_col_tiles):
-            for k in range(num_col_tiles):
-                print_tile_assignment(tile_row, tile_col, k, pe_idx, indent=2)
-                print_pe_stats(pe_idx, stats.pe_stats[pe_idx], indent=4)
-                pe_idx += 1
-    
-    print("\nSystem-wide Stats")
-    print("═" * 50)
-    print_system_stats(stats, indent=2)
+
+    if verbose:
+        print("\nComputation Results")
+        print("═" * 50)
+        print_matrix("Hardware Result", result_array)
+        print_matrix("Software Reference", software_reference)
+
+        print("\nProcessing Element Stats")
+        print("═" * 50)
+        num_row_tiles = (matrix_size + tile_size - 1) // tile_size
+        num_col_tiles = (matrix_size + tile_size - 1) // tile_size
+        pe_idx = 0
+        for tile_row in range(num_row_tiles):
+            for tile_col in range(num_col_tiles):
+                for k in range(num_col_tiles):
+                    print_tile_assignment(tile_row, tile_col, k, pe_idx, indent=2)
+                    print_pe_stats(pe_idx, stats.pe_stats[pe_idx], indent=4)
+                    pe_idx += 1
+
+        print("\nSystem-wide Stats")
+        print("═" * 50)
+        print_system_stats(stats, indent=2)
+
+    return result_array, software_reference, stats
 
 if __name__ == "__main__":
-    test_mpGEMM() 
+    matrix_size = 8
+    tile_size = 4
+    num_bits = 4
+    run_matmul_test(matrix_size, tile_size, num_bits, verbose=True) 
