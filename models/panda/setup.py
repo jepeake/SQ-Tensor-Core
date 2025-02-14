@@ -44,10 +44,10 @@ setup(
     cmdclass=dict(build_ext=CMakeBuild),
     packages=['panda'],
     package_dir={'panda': '.'},
-    py_modules=['cli'],
+    py_modules=['interface'],
     entry_points={
         'console_scripts': [
-            'panda = cli:main'
+            'panda = interface:main'
         ]
     },
     zip_safe=False,
