@@ -2,7 +2,7 @@
 #include <cstddef>
 #include <vector>
 
-namespace spmpGEMM {
+namespace panda {
 
 struct PEStats {
     size_t total_cycles;
@@ -63,4 +63,4 @@ struct SystemStats {
     }
 };
 
-} // namespace spmpGEMM
+} // namespace panda

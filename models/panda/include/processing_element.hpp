@@ -4,7 +4,7 @@
 #include "stats.hpp"
 #include <vector>
 
-namespace spmpGEMM {
+namespace panda {
 
 class ProcessingElement {
 private:
@@ -22,4 +22,4 @@ public:
     void reset_stats() { stats.clear(); }
 };
 
-} // namespace spmpGEMM
+} // namespace panda

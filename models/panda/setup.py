@@ -24,23 +24,25 @@ class CMakeBuild(build_ext):
         
         cmake_args = [
             f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}',
-            f'-DPYTHON_EXECUTABLE={sys.executable}'
+            f'-DPYTHON_EXECUTABLE={sys.executable}',
+            '-GNinja',
+            '-DCMAKE_BUILD_TYPE=Release'
         ]
 
-        build_args = ['--config', 'Release']
+        build_args = []
 
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
             
         subprocess.check_call(['cmake', ext.sourcedir] + cmake_args, cwd=self.build_temp)
-        subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
+        subprocess.check_call(['ninja'], cwd=self.build_temp)
 
 setup(
-    name='spmp_gemm',
+    name='panda',
     version='0.1',
     author='Jacob Peake',
-    description='SPMP-GEMM Python Bindings',
-    ext_modules=[CMakeExtension('spmp_gemm')],
+    description='Panda Python Bindings',
+    ext_modules=[CMakeExtension('panda')],
     cmdclass=dict(build_ext=CMakeBuild),
     zip_safe=False,
 ) 

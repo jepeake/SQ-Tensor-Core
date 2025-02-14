@@ -4,7 +4,7 @@
 #include <vector>
 #include <memory>
 
-namespace spmpGEMM {
+namespace panda {
 
 class PEArray {
 private:
@@ -57,4 +57,4 @@ public:
     }
 };
 
-} // namespace spmpGEMM 
+} // namespace panda 

@@ -3,7 +3,7 @@
 #include <iomanip>
 #include <cmath>
 
-namespace spmpGEMM {
+namespace panda {
 
 SIMDEngine::SIMDEngine(const std::string& weight_file) {
     weight_mem = std::make_unique<WeightMemory>(weight_file);
@@ -157,4 +157,4 @@ Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16
     return result;
 }
 
-} // namespace spmpGEMM
+} // namespace panda

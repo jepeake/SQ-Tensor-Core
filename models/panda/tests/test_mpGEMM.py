@@ -1,5 +1,5 @@
 import numpy as np
-from spmp_gemm import SIMDEngine
+from panda import SIMDEngine
 from preprocessing.preprocess_weights import preprocess_weights
 from typing import List, Dict
 import textwrap

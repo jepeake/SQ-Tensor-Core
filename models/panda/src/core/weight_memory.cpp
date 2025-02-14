@@ -3,7 +3,7 @@
 #include <stdexcept>
 #include <iostream>
 
-namespace spmpGEMM {
+namespace panda {
 
 WeightMemory::WeightMemory(const std::string& weight_file) {
     loadWeights(weight_file);
@@ -85,7 +85,6 @@ void WeightMemory::loadWeights(const std::string& filename) {
         std::cerr << "Error: " << e.what() << std::endl;
         throw;
     }
-
 }
 
-} // namespace spmpGEMM
+} // namespace panda

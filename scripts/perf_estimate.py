@@ -39,8 +39,8 @@ def calculate_mixpe_costs(weight_bits: int = 4, activation_bits: int = 8) -> Dic
         },
         'adder_tree': {
             'count': weight_bits,  
-            'energy': (weight_bits) * HardwareCosts.ENERGY['add_8bit'],
-            'area': (weight_bits) * HardwareCosts.AREA['add_8bit']
+            'energy': weight_bits * HardwareCosts.ENERGY['add_8bit'],
+            'area': weight_bits * HardwareCosts.AREA['add_8bit']
         },
         'bit_comparators': {
             'count': weight_bits,
@@ -60,12 +60,11 @@ def calculate_mixpe_costs(weight_bits: int = 4, activation_bits: int = 8) -> Dic
     }
 
 def calculate_pe_costs(tile_dim: int = 4, weight_bits: int = 4, activation_bits: int = 8) -> Dict:
-
     elements_per_tile = tile_dim * tile_dim
     base_adders = tile_dim * weight_bits - 1
     compressed_adders = base_adders // 4
     
-    spmpgemm_components = {
+    panda_components = {
         'transmission_gates': {
             'count': elements_per_tile * weight_bits,
             'energy': elements_per_tile * weight_bits * HardwareCosts.ENERGY['transmission_gate'],
@@ -93,18 +92,18 @@ def calculate_pe_costs(tile_dim: int = 4, weight_bits: int = 4, activation_bits:
     
     mixpe_costs = calculate_mixpe_costs(weight_bits, activation_bits)
     
-    spmpgemm_total_energy = sum(comp['energy'] for comp in spmpgemm_components.values())
-    spmpgemm_total_area = sum(comp['area'] for comp in spmpgemm_components.values())
+    panda_total_energy = sum(comp['energy'] for comp in panda_components.values())
+    panda_total_area = sum(comp['area'] for comp in panda_components.values())
     
     mac_total_energy = sum(comp['energy'] for comp in mac_components.values())
     mac_total_area = sum(comp['area'] for comp in mac_components.values())
     
     return {
         'tile_config': f"{tile_dim}x{tile_dim} W{weight_bits}A{activation_bits}",
-        'spmpgemm': {
-            'components': spmpgemm_components,
-            'total_energy': spmpgemm_total_energy,
-            'total_area': spmpgemm_total_area
+        'panda': {
+            'components': panda_components,
+            'total_energy': panda_total_energy,
+            'total_area': panda_total_area
         },
         'mac': {
             'components': mac_components,
@@ -117,8 +116,8 @@ def calculate_pe_costs(tile_dim: int = 4, weight_bits: int = 4, activation_bits:
             'total_area': mixpe_costs['total_area']
         },
         'comparison': {
-            'spmpgemm_mac_energy_ratio': spmpgemm_total_energy / mac_total_energy,
-            'spmpgemm_mac_area_ratio': spmpgemm_total_area / mac_total_area,
+            'panda_mac_energy_ratio': panda_total_energy / mac_total_energy,
+            'panda_mac_area_ratio': panda_total_area / mac_total_area,
             'mixpe_mac_energy_ratio': mixpe_costs['total_energy'] / mac_total_energy,
             'mixpe_mac_area_ratio': mixpe_costs['total_area'] / mac_total_area
         }
@@ -133,10 +132,10 @@ def analyse_matrix_scaling(matrix_sizes: list, tile_dim: int = 4):
         results.append({
             'matrix_size': size,
             'num_tiles': num_tiles,
-            'total_spmpgemm_energy': pe_costs['spmpgemm']['total_energy'] * num_tiles,
+            'total_panda_energy': pe_costs['panda']['total_energy'] * num_tiles,
             'total_mac_energy': pe_costs['mac']['total_energy'] * num_tiles,
             'total_mixpe_energy': pe_costs['mixpe']['total_energy'] * num_tiles,
-            'total_spmpgemm_area': pe_costs['spmpgemm']['total_area'] * num_tiles,
+            'total_panda_area': pe_costs['panda']['total_area'] * num_tiles,
             'total_mac_area': pe_costs['mac']['total_area'] * num_tiles,
             'total_mixpe_area': pe_costs['mixpe']['total_area'] * num_tiles
         })
@@ -148,7 +147,7 @@ def plot_scaling_analysis(matrix_sizes: list, results: list):
     
     # Energy
     plt.subplot(2, 2, 1)
-    plt.plot(matrix_sizes, [r['total_spmpgemm_energy'] for r in results], 'b-o', label='SpMpGEMM')
+    plt.plot(matrix_sizes, [r['total_panda_energy'] for r in results], 'b-o', label='Panda')
     # plt.plot(matrix_sizes, [r['total_mac_energy'] for r in results], 'r-o', label='MAC')
     plt.plot(matrix_sizes, [r['total_mixpe_energy'] for r in results], 'g-o', label='MixPE')
     plt.title('Total Energy vs Matrix Size')
@@ -159,7 +158,7 @@ def plot_scaling_analysis(matrix_sizes: list, results: list):
     
     # Area 
     plt.subplot(2, 2, 2)
-    plt.plot(matrix_sizes, [r['total_spmpgemm_area'] for r in results], 'b-o', label='SpMpGEMM')
+    plt.plot(matrix_sizes, [r['total_panda_area'] for r in results], 'b-o', label='Panda')
     # plt.plot(matrix_sizes, [r['total_mac_area'] for r in results], 'r-o', label='MAC')
     plt.plot(matrix_sizes, [r['total_mixpe_area'] for r in results], 'g-o', label='MixPE')
     plt.title('Total Area vs Matrix Size')

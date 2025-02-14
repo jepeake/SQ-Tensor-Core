@@ -3,7 +3,7 @@
 #include "pe_array.hpp"
 #include <memory>
 
-namespace spmpGEMM {
+namespace panda {
 
 class SIMDEngine {
 private:
@@ -26,4 +26,4 @@ public:
     size_t getNumPEs() const { return num_pes; }
 };
 
-} // namespace spmpGEMM
+} // namespace panda

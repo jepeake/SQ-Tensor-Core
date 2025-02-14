@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(SPMP-GEMM CXX)
+project(PANDA CXX)
 
 # C++
 set(CMAKE_CXX_STANDARD 17)
@@ -48,16 +48,16 @@ set(CORE_SOURCES
 )
 
 # Create Python Module
-pybind11_add_module(spmp_gemm 
+pybind11_add_module(panda 
     src/python/bindings.cpp
     ${CORE_SOURCES}
 )
 
-target_include_directories(spmp_gemm PRIVATE 
+target_include_directories(panda PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 # Create Executable Target (optional)
-add_executable(SPMP-GEMM ${CORE_SOURCES} src/main.cpp)
-target_include_directories(SPMP-GEMM PRIVATE 
+add_executable(PANDA ${CORE_SOURCES} src/main.cpp)
+target_include_directories(PANDA PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )

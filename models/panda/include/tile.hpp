@@ -2,7 +2,7 @@
 #include <vector>
 #include <cstdint>
 
-namespace spmpGEMM {
+namespace panda {
 
 template<typename T>
 struct Tile {
@@ -22,4 +22,4 @@ struct Tile {
     }
 };
 
-} // namespace spmpGEMM
+} // namespace panda
