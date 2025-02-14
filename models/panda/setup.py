@@ -29,8 +29,6 @@ class CMakeBuild(build_ext):
             '-DCMAKE_BUILD_TYPE=Release'
         ]
 
-        build_args = []
-
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
             
@@ -42,7 +40,15 @@ setup(
     version='0.1',
     author='Jacob Peake',
     description='Panda Python Bindings',
-    ext_modules=[CMakeExtension('panda')],
+    ext_modules=[CMakeExtension('panda._panda')],
     cmdclass=dict(build_ext=CMakeBuild),
+    packages=['panda'],
+    package_dir={'panda': '.'},
+    py_modules=['cli'],
+    entry_points={
+        'console_scripts': [
+            'panda = cli:main'
+        ]
+    },
     zip_safe=False,
 ) 
