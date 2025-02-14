@@ -31,7 +31,8 @@ def main():
 ⣿⣿⣿⣿⣧⣀⡀⠀⠀⠀⠀⠀⣀⣰⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
 ⣿⣿⣿⣿⣿⣿⣿⣷⣶⣶⣶⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
     """)
-    print("Welcome to the Panda Hardware Model 🐼 \n")
+    print("Welcome to the Panda Hardware Model 🐼\n")
+    print("Type 'help' to see available commands.\n")
     while True:
         try:
             print("> ", end='', flush=True)
@@ -40,14 +41,20 @@ def main():
                 char = getch()
                 if char == '\r' or char == '\n':
                     print()
-                    if command.strip() == "test":
+                    command = command.strip()
+                    if command == "test":
                         try:
-                            test_script = os.path.join(current_dir, "tests", "test_mpGEMM.py")
+                            test_script = os.path.join(current_dir, "tests", "test_matmul.py")
                             subprocess.run(["python", test_script], check=True)
                         except subprocess.CalledProcessError as e:
                             print(f"Error running tests: {e}")
                         except FileNotFoundError:
-                            print(f"Error: test_mpGEMM.py not found in {os.path.join(current_dir, 'tests')}")
+                            print(f"Error: test_matmul.py not found in {os.path.join(current_dir, 'tests')}")
+                    elif command == "help":
+                        print("\nCommands:")
+                        print("  help  - See Available Commands.")
+                        print("  test  - Run the Test Suite.")
+                        print("  q     - Quit.\n")
                     break
                 elif char.lower() == 'q':
                     print()
