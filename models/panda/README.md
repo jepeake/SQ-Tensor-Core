@@ -23,9 +23,8 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-## _Running Tests_
+## _Running_
 
 ```
-cd models/panda
-python tests/test_mpGEMM,py
+panda
 ```
