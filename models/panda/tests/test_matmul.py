@@ -39,7 +39,7 @@ def print_pe_assignment(pe_idx: int, weight_tiles: List[np.ndarray], act_tile: n
     
     print(f"\n{separator}")
     print(f"{indent_str}Processing Element {pe_idx}")
-    print(f"{separator}")
+    print(f"{indent_str}{separator}")
     
     print_tile("Activation Tile", act_tile, indent + 2)
     
@@ -109,6 +109,42 @@ def print_system_stats(stats, indent: int = 0):
     print(f"{indent_str}│ Total Parallel Execution Time: {stats.total_parallel_cycles:<14}    │")
     print(f"{indent_str}└{'─' * 50}┘")
 
+def format_throughput(ops):
+    if ops >= 1e9:
+        return f"{ops / 1e9:.2f} Gops/s"
+    elif ops >= 1e6:
+        return f"{ops / 1e6:.2f} Mops/s"
+    elif ops >= 1e3:
+        return f"{ops / 1e3:.2f} Kops/s"
+    else:
+        return f"{ops:.2f} ops/s"
+
+def format_bandwidth(bps):
+    """Format bandwidth to human-readable string."""
+    if bps >= 1e9:
+        return f"{bps / 1e9:.2f} GB/s"
+    elif bps >= 1e6:
+        return f"{bps / 1e6:.2f} MB/s"
+    elif bps >= 1e3:
+        return f"{bps / 1e3:.2f} KB/s"
+    else:
+        return f"{bps:.2f} B/s"
+
+def print_performance_metrics(metrics, indent: int = 0):
+    indent_str = " " * indent
+
+    throughput_str = format_throughput(metrics.throughput_ops)
+    bandwidth_str = format_bandwidth(metrics.memory_bandwidth_bytes_per_sec)
+    latency_str = f"{metrics.system_latency_ns:.2f} ns"
+
+    print(f"\n{indent_str}┌{'─' * 50}┐")
+    print(f"{indent_str}│ Performance Metrics                     │")
+    print(f"{indent_str}├{'─' * 50}┤")
+    print(f"{indent_str}│ Overall Latency         : {latency_str:>15} │")
+    print(f"{indent_str}│ Throughput              : {throughput_str:>15} │")
+    print(f"{indent_str}│ Memory Bandwidth        : {bandwidth_str:>15} │")
+    print(f"{indent_str}└{'─' * 50}┘")
+
 # ----- End of Pretty Printing -----
 
 
@@ -134,12 +170,6 @@ def suppress_all_output():
             os.close(old_stderr_fd)
 
 def run_matmul_test(matrix_size, tile_size, num_bits, activation_threshold=0, verbose=True):
-    """
-    Runs a hardware matrix multiplication test.
-    Prints detailed output (including input matrices, matrix info,
-    computation results, processing element stats, and system-wide stats)
-    in the same style as the old test_matmul function.
-    """
     weights = np.random.randint(0, 15, size=(matrix_size, matrix_size), dtype=np.int8)
     activations = np.random.randint(-128, 127, size=(matrix_size, matrix_size), dtype=np.int32)
 
@@ -188,11 +218,15 @@ def run_matmul_test(matrix_size, tile_size, num_bits, activation_threshold=0, ve
         print("\nSystem-wide Stats")
         print("═" * 50)
         print_system_stats(stats, indent=2)
+        
+        clock_frequency_hz = 1e9  # 1 GHz
+        performance_metrics = engine.get_performance_metrics(clock_frequency_hz)
+        print_performance_metrics(performance_metrics, indent=2)
 
     return result_array, software_reference, stats
 
 if __name__ == "__main__":
-    matrix_size = 8
+    matrix_size = 16
     tile_size = 4
     num_bits = 4
     run_matmul_test(matrix_size, tile_size, num_bits, verbose=True) 

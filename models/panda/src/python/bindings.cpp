@@ -2,6 +2,7 @@
 #include <pybind11/stl.h>
 #include "../include/simd_engine.hpp"
 #include "../include/stats.hpp"
+#include "../include/performance_metrics.hpp"  // Include the header for PerformanceMetrics
 
 namespace py = pybind11;
 
@@ -35,6 +36,12 @@ PYBIND11_MODULE(panda, m) {
         .def_readonly("total_parallel_shifts", &panda::SystemStats::total_parallel_shifts)
         .def_readonly("total_parallel_additions", &panda::SystemStats::total_parallel_additions);
 
+    // Bind the PerformanceMetrics 
+    py::class_<panda::PerformanceMetrics>(m, "PerformanceMetrics")
+        .def_readonly("system_latency_ns", &panda::PerformanceMetrics::system_latency_ns)
+        .def_readonly("throughput_ops", &panda::PerformanceMetrics::throughput_ops)
+        .def_readonly("memory_bandwidth_bytes_per_sec", &panda::PerformanceMetrics::memory_bandwidth_bytes_per_sec);
+
     // Bind the SIMDEngine 
     py::class_<panda::SIMDEngine>(m, "SIMDEngine")
         .def(py::init<const std::string&>())
@@ -45,5 +52,7 @@ PYBIND11_MODULE(panda, m) {
         .def("get_matrix_rows", &panda::SIMDEngine::getMatrixRows)
         .def("get_matrix_cols", &panda::SIMDEngine::getMatrixCols)
         .def("get_tile_size", &panda::SIMDEngine::getTileSize)
-        .def("get_num_pes", &panda::SIMDEngine::getNumPEs);
+        .def("get_num_pes", &panda::SIMDEngine::getNumPEs)
+        .def("get_performance_metrics", &panda::SIMDEngine::getPerformanceMetrics,
+             py::arg("clock_frequency_hz"));
 }

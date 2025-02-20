@@ -157,4 +157,39 @@ Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16
     return result;
 }
 
+PerformanceMetrics SIMDEngine::getPerformanceMetrics(double clock_frequency_hz) const {
+    PerformanceMetrics metrics;
+    
+    double clock_period_ns = 1e9 / clock_frequency_hz;
+    
+    // Overall Latency in ns
+    double total_cycles = static_cast<double>(system_stats.total_parallel_cycles);
+    metrics.system_latency_ns = total_cycles * clock_period_ns;
+    
+    // Estimate Total Number of Tiles
+    size_t num_tiles_dim = (matrix_rows + tile_size - 1) / tile_size;
+    size_t total_tiles = num_tiles_dim * num_tiles_dim * num_tiles_dim;
+    
+    // Total MAC Operations per Tile Multiplication
+    size_t macs_per_tile = tile_size * tile_size * tile_size;
+    size_t total_MACs = total_tiles * macs_per_tile;
+    
+    // Calculate Throughput: Total MACs divided by Total Run Time in Seconds
+    double system_time_sec = metrics.system_latency_ns * 1e-9;
+    metrics.throughput_ops = (system_time_sec > 0) ? (static_cast<double>(total_MACs) / system_time_sec) : 0.0;
+    
+    // Estimate Memory Bandwidth
+    // For Each Tile, the Transferred Data Includes:
+    //   - Weight Tile: num_bits * (tile_size^2) bytes.
+    //   - Activation Tile: tile_size^2 * sizeof(int16_t) = 2 * (tile_size^2) bytes.
+    //   - Result tile: tile_size^2 * sizeof(int32_t) = 4 * (tile_size^2) bytes.
+    size_t num_bits = weight_mem->getNumBits();
+    size_t bytes_per_tile = tile_size * tile_size * (num_bits + 2 + 4); 
+    size_t total_bytes = total_tiles * bytes_per_tile;
+    
+    metrics.memory_bandwidth_bytes_per_sec = (system_time_sec > 0) ? (total_bytes / system_time_sec) : 0.0;
+    
+    return metrics;
+}
+
 } // namespace panda

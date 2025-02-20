@@ -1,6 +1,7 @@
 #pragma once
 #include "weight_memory.hpp"
 #include "pe_array.hpp"
+#include "performance_metrics.hpp"
 #include <memory>
 
 namespace panda {
@@ -24,6 +25,8 @@ public:
     size_t getMatrixCols() const { return matrix_cols; }
     size_t getTileSize() const { return tile_size; }
     size_t getNumPEs() const { return num_pes; }
+    
+    PerformanceMetrics getPerformanceMetrics(double clock_frequency_hz) const;
 };
 
 } // namespace panda
