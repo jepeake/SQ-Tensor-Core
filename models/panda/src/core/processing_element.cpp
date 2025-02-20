@@ -39,7 +39,7 @@ Tile<int32_t> ProcessingElement::mpGEMM(
                 
                 // Shift
                 // In Hardware, all shifts occur in parallel (rewiring)
-                stats.shifting_operations = 1;
+                stats.shifting_operations = 0;
                 int32_t shifted_activation = 0;
                 for (size_t bit = 0; bit < num_bits; bit++) {
                     stats.total_shifts++;
@@ -63,8 +63,8 @@ Tile<int32_t> ProcessingElement::mpGEMM(
     }
 
     stats.total_cycles = stats.masking_operations + 
-                        stats.shifting_operations + 
-                        stats.addition_operations;
+                         stats.shifting_operations + 
+                         stats.addition_operations;
 
     return result;
 }
