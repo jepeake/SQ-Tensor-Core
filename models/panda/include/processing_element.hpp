@@ -20,6 +20,8 @@ public:
 
     const PEStats& get_stats() const { return stats; }
     void reset_stats() { stats.clear(); }
+
+    void set_simulated_total_cycles(size_t cycles) { stats.total_cycles = cycles; }
 };
 
 } // namespace panda

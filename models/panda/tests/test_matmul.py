@@ -207,13 +207,12 @@ def run_matmul_test(matrix_size, tile_size, num_bits, activation_threshold=0, ve
         print("═" * 50)
         num_row_tiles = (matrix_size + tile_size - 1) // tile_size
         num_col_tiles = (matrix_size + tile_size - 1) // tile_size
-        pe_idx = 0
         for tile_row in range(num_row_tiles):
             for tile_col in range(num_col_tiles):
                 for k in range(num_col_tiles):
-                    print_tile_assignment(tile_row, tile_col, k, pe_idx, indent=2)
-                    print_pe_stats(pe_idx, stats.pe_stats[pe_idx], indent=4)
-                    pe_idx += 1
+                    assigned_pe = (tile_row * num_col_tiles * num_col_tiles + tile_col * num_col_tiles + k) % engine.get_num_pes()
+                    print_tile_assignment(tile_row, tile_col, k, assigned_pe, indent=2)
+                    print_pe_stats(assigned_pe, stats.pe_stats[assigned_pe], indent=4)
 
         print("\nSystem-wide Stats")
         print("═" * 50)

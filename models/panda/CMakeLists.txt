@@ -13,10 +13,18 @@ find_package(Python COMPONENTS Interpreter Development REQUIRED)
 include(FetchContent)
 FetchContent_Declare(
     pybind11
-    GIT_REPOSITORY https://github.com/pybind/pybind11
+    GIT_REPOSITORY https://github.com/pybind/pybind11.git
     GIT_TAG        v2.11.1
 )
 FetchContent_MakeAvailable(pybind11)
+
+# nlohmann_json (added to resolve target error)
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG        v3.11.2
+)
+FetchContent_MakeAvailable(nlohmann_json)
 
 # Use Clang
 set(CMAKE_C_COMPILER "clang")
@@ -45,6 +53,7 @@ set(CORE_SOURCES
     src/core/weight_memory.cpp
     src/core/processing_element.cpp
     src/core/simd_engine.cpp
+    src/config.cpp
 )
 
 # Create Python Module
@@ -52,12 +61,14 @@ pybind11_add_module(panda
     src/python/bindings.cpp
     ${CORE_SOURCES}
 )
-
 target_include_directories(panda PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+target_link_libraries(panda PRIVATE nlohmann_json::nlohmann_json)
+
 # Create Executable Target (optional)
 add_executable(PANDA ${CORE_SOURCES} src/main.cpp)
 target_include_directories(PANDA PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+target_link_libraries(PANDA PRIVATE nlohmann_json::nlohmann_json)

@@ -1,24 +1,26 @@
 #include "../include/simd_engine.hpp"
+#include "../include/config.hpp"
 #include <iostream>
 #include <iomanip>
 #include <cmath>
+#include <filesystem>
 
 namespace panda {
 
 SIMDEngine::SIMDEngine(const std::string& weight_file) {
+    std::filesystem::path config_path = std::filesystem::current_path() / "panda_config.json";
+    if (!std::filesystem::exists(config_path)) {
+        config_path = std::filesystem::current_path() / "src/core/panda_config.json";
+    }
+    std::cout << "Loading configuration from: " << config_path << std::endl;
+    config::loadConfig(config_path.string());
+
     weight_mem = std::make_unique<WeightMemory>(weight_file);
     tile_size = weight_mem->getTileSize();
     matrix_rows = weight_mem->getNumRows();
     matrix_cols = weight_mem->getNumCols();
 
-    // No. Tiles in Each Dimension
-    size_t num_tiles_dim = (matrix_rows + tile_size - 1) / tile_size;
-    
-    // Number of PEs needed is (N/M)^3 where:
-    // N is the matrix dimension (assuming square matrices)
-    // M is the tile dimension
-    num_pes = num_tiles_dim * num_tiles_dim * num_tiles_dim;
-
+    num_pes = config::num_pes;
     pe_array = std::make_unique<PEArray>(num_pes, tile_size);
 }
 
@@ -151,7 +153,10 @@ Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16
         }
     }
 
-    system_stats.pe_stats = pe_array->getStats();
+    // After processing tiles, aggregate the stats from all PEs
+    // (Even if some PEs never received work - they will be included with zeroed stats)
+    system_stats.pe_stats = pe_array->getAllStats();
+
     system_stats.calculateSystemStats();
     
     return result;
