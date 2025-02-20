@@ -32,7 +32,7 @@ public:
         
         // Timing Parameters
         const size_t L_mask = 1;  // Masking Stage Latency
-        size_t L_add = static_cast<size_t>(std::ceil(std::log2(tile_size)));
+        size_t L_add = static_cast<size_t>(std::ceil(std::log2(tile_size * num_bits)));
         const size_t L_total = L_mask + L_add;  // Total Latency per Tile
 
         // Track Finish Time (Cycle Count) for Each PE

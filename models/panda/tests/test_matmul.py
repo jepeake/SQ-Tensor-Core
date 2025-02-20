@@ -8,11 +8,9 @@ import contextlib
 import sys
 import json
 
-
 # ----- Pretty Printing -----
 
 def print_matrix(name: str, matrix: np.ndarray, indent: int = 0):
-    """Pretty print a matrix with name and formatting"""
     indent_str = " " * indent
     print(f"\n{indent_str}{name}:")
     print(f"{indent_str}{'=' * (len(name) + 1)}")
@@ -23,7 +21,6 @@ def print_matrix(name: str, matrix: np.ndarray, indent: int = 0):
         print(indent_str + " ".join(f"{x:>{max_width}}" for x in row))
 
 def print_tile(name: str, tile: np.ndarray, indent: int = 0):
-    """Pretty print a tile with borders"""
     indent_str = " " * indent
     print(f"\n{indent_str}{name}:")
     print(f"{indent_str}┌{'─' * (tile.shape[1] * 4 + 1)}┐")
@@ -34,7 +31,6 @@ def print_tile(name: str, tile: np.ndarray, indent: int = 0):
     print(f"{indent_str}└{'─' * (tile.shape[1] * 4 + 1)}┘")
 
 def print_pe_assignment(pe_idx: int, weight_tiles: List[np.ndarray], act_tile: np.ndarray, indent: int = 0):
-    """Print PE assignment details with tiles"""
     indent_str = " " * indent
     separator = f"{indent_str}{'─' * 50}"
     
@@ -48,7 +44,6 @@ def print_pe_assignment(pe_idx: int, weight_tiles: List[np.ndarray], act_tile: n
         print_tile(f"Weight Tile (Bit {bit})", w_tile, indent + 2)
 
 def print_matrix_info(engine: SIMDEngine):
-    """Print matrix and tiling information"""
     matrix_rows = engine.get_matrix_rows()
     matrix_cols = engine.get_matrix_cols()
     tile_size = engine.get_tile_size()
@@ -68,7 +63,6 @@ def print_matrix_info(engine: SIMDEngine):
     print(f"Available PEs: {num_pes}")
 
 def print_tile_assignment(tile_row: int, tile_col: int, k: int, pe_idx: int, indent: int = 0):
-    """Print tile assignment information including both activation and weight tile locations"""
     indent_str = " " * indent
     print(f"\n{indent_str}Tile Assignment:")
     print(f"{indent_str}├─ Activation Tile Location: ({tile_row}, {k})")
@@ -96,11 +90,10 @@ def print_pe_stats(pe_idx: int, stats, indent: int = 0):
     print(f"{indent_str}└{'─' * 40}┘")
 
 def print_system_stats(stats, indent: int = 0):
-    """Pretty print system-wide statistics with box drawing characters"""
     indent_str = " " * indent
     
     print(f"\n{indent_str}┌{'─' * 50}┐")
-    print(f"{indent_str}│ System-wide Statistics (Parallel Execution)      │")
+    print(f"{indent_str}│ System Statistics (Parallel Execution)           │")
     print(f"{indent_str}├{'─' * 50}┤")
     print(f"{indent_str}│ Maximum Parallel Operations:                     │")
     print(f"{indent_str}│   ├─ Masking:  {stats.total_parallel_mask_ops:<4} cycles                       │")
@@ -121,7 +114,6 @@ def format_throughput(ops):
         return f"{ops:.2f} ops/s"
 
 def format_bandwidth(bps):
-    """Format bandwidth to human-readable string."""
     if bps >= 1e9:
         return f"{bps / 1e9:.2f} GB/s"
     elif bps >= 1e6:
@@ -139,24 +131,59 @@ def print_performance_metrics(metrics, indent: int = 0):
     latency_str = f"{metrics.system_latency_ns:.2f} ns"
 
     print(f"\n{indent_str}┌{'─' * 50}┐")
-    print(f"{indent_str}│ Performance Metrics                     │")
+    print(f"{indent_str}│ Performance Metrics                              │")
     print(f"{indent_str}├{'─' * 50}┤")
-    print(f"{indent_str}│ Overall Latency         : {latency_str:>15} │")
-    print(f"{indent_str}│ Throughput              : {throughput_str:>15} │")
-    print(f"{indent_str}│ Memory Bandwidth        : {bandwidth_str:>15} │")
+    print(f"{indent_str}│ Overall Latency         : {latency_str:>15}        │")
+    print(f"{indent_str}│ Throughput              : {throughput_str:>15}        │")
+    print(f"{indent_str}│ Memory Bandwidth        : {bandwidth_str:>15}        │")
     print(f"{indent_str}└{'─' * 50}┘")
 
-# ----- End of Pretty Printing -----
+def print_grouped_pe_assignments_and_stats(engine: SIMDEngine, stats, matrix_size: int, tile_size: int):
+    num_row_tiles = (matrix_size + tile_size - 1) // tile_size
+    num_col_tiles = (matrix_size + tile_size - 1) // tile_size
+    num_pes = engine.get_num_pes()
 
+    # Create a Dictionary to Collect Assignments per PE
+    # In pe_array - scheduling each job is assigned by: assigned_pe = global_job_index % num_pes,
+    # where global_job_index increments across all jobs
+    pe_assignments = {pe: [] for pe in range(num_pes)}
+    global_job = 0
+    for tile_row in range(num_row_tiles):
+        for tile_col in range(num_col_tiles):
+            for k in range(num_col_tiles):
+                assigned_pe = global_job % num_pes
+                assignment_str = f"Job {global_job}: Activation Tile ({tile_row}, {k}), Weight Tile ({k}, {tile_col})"
+                pe_assignments[assigned_pe].append(assignment_str)
+                global_job += 1
+
+    for pe in range(num_pes):
+        print(f"\nProcessing Element {pe}")
+        print("─" * 50)
+        if pe_assignments[pe]:
+            print("Assigned Jobs:")
+            for assign in pe_assignments[pe]:
+                print("  " + assign)
+        else:
+            print("No assignments")
+
+        pe_stat = stats.pe_stats[pe]
+        # print("\nAggregated Operation Cycles:")
+        # print(f"  Masking   : {pe_stat.masking_operations} cycles")
+        # print(f"  Shifting  : {pe_stat.shifting_operations} cycles")
+        # print(f"  Addition  : {pe_stat.addition_operations} cycles")
+        print("\n Latency:")
+        print(f"  Masking   : {pe_stat.masking_operations} cycles (per tile)")
+        print(f"  Shifting  : {pe_stat.shifting_operations} cycles (per tile)")
+        print(f"  Addition  : {pe_stat.addition_operations} cycles (per tile)")
+        print(f"  Total     : {pe_stat.total_cycles} cycles (pipelined)")
+        print("─" * 50)
+
+# ----- End of Pretty Printing -----
 
 # ----- Test -----
 
 @contextlib.contextmanager
 def suppress_all_output():
-    """
-    Suppress stdout and stderr (including output from C++ code) by redirecting
-    the underlying file descriptors to os.devnull.
-    """
     with open(os.devnull, 'w') as devnull:
         old_stdout_fd = os.dup(1)
         old_stderr_fd = os.dup(2)
@@ -206,16 +233,10 @@ def run_matmul_test(matrix_size, tile_size, num_bits, activation_threshold=0, ve
 
         print("\nProcessing Element Stats")
         print("═" * 50)
-        num_row_tiles = (matrix_size + tile_size - 1) // tile_size
-        num_col_tiles = (matrix_size + tile_size - 1) // tile_size
-        for tile_row in range(num_row_tiles):
-            for tile_col in range(num_col_tiles):
-                for k in range(num_col_tiles):
-                    assigned_pe = (tile_row * num_col_tiles * num_col_tiles + tile_col * num_col_tiles + k) % engine.get_num_pes()
-                    print_tile_assignment(tile_row, tile_col, k, assigned_pe, indent=2)
-                    print_pe_stats(assigned_pe, stats.pe_stats[assigned_pe], indent=4)
 
-        print("\nSystem-wide Stats")
+        print_grouped_pe_assignments_and_stats(engine, stats, matrix_size, tile_size)
+
+        print("\nSystem Stats")
         print("═" * 50)
         print_system_stats(stats, indent=2)
         
