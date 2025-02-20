@@ -6,6 +6,7 @@ import textwrap
 import os
 import contextlib
 import sys
+import json
 
 
 # ----- Pretty Printing -----
@@ -225,7 +226,19 @@ def run_matmul_test(matrix_size, tile_size, num_bits, activation_threshold=0, ve
     return result_array, software_reference, stats
 
 if __name__ == "__main__":
-    matrix_size = 16
-    tile_size = 4
+
+    this_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(this_dir, "..", "src", "core", "panda_config.json")
+    
+    try:
+        with open(config_path, "r") as f:
+            config_data = json.load(f)
+    except Exception as e:
+        print(f"Error reading configuration file ({config_path}): {e}")
+        config_data = {}
+
+    matrix_size = config_data.get("matrix_size", 16)
+    tile_size = config_data.get("tile_size", 4)
     num_bits = 4
+
     run_matmul_test(matrix_size, tile_size, num_bits, verbose=True) 

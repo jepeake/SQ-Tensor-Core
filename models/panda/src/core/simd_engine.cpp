@@ -12,7 +12,6 @@ SIMDEngine::SIMDEngine(const std::string& weight_file) {
     if (!std::filesystem::exists(config_path)) {
         config_path = std::filesystem::current_path() / "src/core/panda_config.json";
     }
-    std::cout << "Loading configuration from: " << config_path << std::endl;
     config::loadConfig(config_path.string());
 
     weight_mem = std::make_unique<WeightMemory>(weight_file);
@@ -33,11 +32,8 @@ Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16
     std::vector<std::vector<Tile<int16_t>>> activation_tiles; 
     size_t num_row_tiles = (matrix_rows + tile_size - 1) / tile_size;
     size_t num_col_tiles = (matrix_cols + tile_size - 1) / tile_size;
-    std::cout << "Number of Row Tiles: " << num_row_tiles << std::endl;
-    std::cout << "Number of Col Tiles: " << num_col_tiles << std::endl;
 
     size_t total_tiles = num_row_tiles * num_col_tiles;
-    std::cout << "Total Tiles: " << total_tiles << std::endl;
 
     // Initialise 2D Vector of Tiles
     activation_tiles.resize(num_row_tiles);
