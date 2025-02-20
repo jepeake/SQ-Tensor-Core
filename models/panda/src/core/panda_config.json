@@ -1,5 +1,5 @@
 {
-    "num_pes": 4,
-    "matrix_size": 8,
+    "num_pes": 1024,
+    "matrix_size": 128,
     "tile_size": 4
 } 

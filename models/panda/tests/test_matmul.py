@@ -94,13 +94,13 @@ def print_system_stats(stats, indent: int = 0):
     
     print(f"\n{indent_str}┌{'─' * 50}┐")
     print(f"{indent_str}│ System Statistics (Parallel Execution)           │")
+    # print(f"{indent_str}├{'─' * 50}┤")
+    # print(f"{indent_str}│ Maximum Parallel Operations:                     │")
+    # print(f"{indent_str}│   ├─ Masking:  {stats.total_parallel_mask_ops:<4} cycles                       │")
+    # print(f"{indent_str}│   ├─ Shifting: {stats.total_parallel_shifts:<4} cycles                       │")
+    # print(f"{indent_str}│   └─ Addition: {stats.total_parallel_additions:<4} cycles                       │")
     print(f"{indent_str}├{'─' * 50}┤")
-    print(f"{indent_str}│ Maximum Parallel Operations:                     │")
-    print(f"{indent_str}│   ├─ Masking:  {stats.total_parallel_mask_ops:<4} cycles                       │")
-    print(f"{indent_str}│   ├─ Shifting: {stats.total_parallel_shifts:<4} cycles                       │")
-    print(f"{indent_str}│   └─ Addition: {stats.total_parallel_additions:<4} cycles                       │")
-    print(f"{indent_str}├{'─' * 50}┤")
-    print(f"{indent_str}│ Total Parallel Execution Time: {stats.total_parallel_cycles:<14}    │")
+    print(f"{indent_str}│ Total Execution Time: {stats.total_parallel_cycles} cycles                  │")
     print(f"{indent_str}└{'─' * 50}┘")
 
 def format_throughput(ops):
@@ -201,9 +201,13 @@ def run_matmul_test(matrix_size, tile_size, num_bits, activation_threshold=0, ve
     weights = np.random.randint(0, 15, size=(matrix_size, matrix_size), dtype=np.int8)
     activations = np.random.randint(-128, 127, size=(matrix_size, matrix_size), dtype=np.int32)
 
+    print("\nInput Matrices Summary")
+    print("═" * 50)
+    print(f"Weight Matrix: shape {weights.shape}")
+    print(f"Activation Matrix: shape {activations.shape}")
+
     if verbose:
-        print("\nInput Matrices")
-        print("═" * 50)
+        print("\nDetailed Input Matrices")
         print_matrix("Weight Matrix", weights)
         print_matrix("Activation Matrix", activations)
 
@@ -211,8 +215,7 @@ def run_matmul_test(matrix_size, tile_size, num_bits, activation_threshold=0, ve
 
     engine = SIMDEngine("weight_bits.bin")
 
-    if verbose:
-        print_matrix_info(engine)
+    print_matrix_info(engine)
 
     if verbose:
         result_tile = engine.compute(activations.flatten().tolist(), activation_threshold)
@@ -225,29 +228,53 @@ def run_matmul_test(matrix_size, tile_size, num_bits, activation_threshold=0, ve
 
     stats = engine.get_stats()
 
+    print("\nComputation Results")
+    print("═" * 50)
+    print_matrix("Hardware Result", result_array)
+    print_matrix("Software Reference", software_reference)
+
+    # Compute job assignments per processing element
+    num_row_tiles = (matrix_size + tile_size - 1) // tile_size
+    num_col_tiles = (matrix_size + tile_size - 1) // tile_size
+    num_pes = engine.get_num_pes()
+
+    # The scheduling is assumed to assign jobs round-robin:
+    pe_assignments = {pe: [] for pe in range(num_pes)}
+    global_job = 0
+    for tile_row in range(num_row_tiles):
+        for tile_col in range(num_col_tiles):
+            for k in range(num_col_tiles):
+                assigned_pe = global_job % num_pes
+                # Format shows the job number and the tile indices
+                assignment_str = f"[Job {global_job}: ActTile=({tile_row},{k}), WTile=({k},{tile_col})]"
+                pe_assignments[assigned_pe].append(assignment_str)
+                global_job += 1
+
+    # Print the processing element stats along with its job assignments on the same line
+    print("\nProcessing Element Stats Summary")
+    print("═" * 50)
+    for idx, pe_stat in enumerate(stats.pe_stats):
+        assignments_str = " ".join(pe_assignments[idx])
+        print(f"PE {idx}: Total Cycles = {pe_stat.total_cycles}, "
+              f"Mask Ops = {pe_stat.total_mask_ops}, "
+              f"Shifts = {pe_stat.total_shifts}, "
+              f"Additions = {pe_stat.total_additions}, "
+              f"Assigned Jobs = {assignments_str}")
+
     if verbose:
-        print("\nComputation Results")
-        print("═" * 50)
-        print_matrix("Hardware Result", result_array)
-        print_matrix("Software Reference", software_reference)
-
-        print("\nProcessing Element Stats")
-        print("═" * 50)
-
         print_grouped_pe_assignments_and_stats(engine, stats, matrix_size, tile_size)
 
-        print("\nSystem Stats")
-        print("═" * 50)
-        print_system_stats(stats, indent=2)
-        
-        clock_frequency_hz = 1e9  # 1 GHz
-        performance_metrics = engine.get_performance_metrics(clock_frequency_hz)
-        print_performance_metrics(performance_metrics, indent=2)
+    print("\nSystem Stats Summary")
+    print("═" * 50)
+    print_system_stats(stats, indent=2)
+    clock_frequency_hz = 1e9  # 1 GHz
+    performance_metrics = engine.get_performance_metrics(clock_frequency_hz)
+    print_performance_metrics(performance_metrics, indent=2)
 
     return result_array, software_reference, stats
 
 if __name__ == "__main__":
-
+    import sys
     this_dir = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.join(this_dir, "..", "src", "core", "panda_config.json")
     
@@ -257,9 +284,10 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Error reading configuration file ({config_path}): {e}")
         config_data = {}
-
+    
     matrix_size = config_data.get("matrix_size", 16)
     tile_size = config_data.get("tile_size", 4)
     num_bits = 4
 
-    run_matmul_test(matrix_size, tile_size, num_bits, verbose=True) 
+    verbose = "--verbose" in sys.argv
+    run_matmul_test(matrix_size, tile_size, num_bits, verbose=verbose) 

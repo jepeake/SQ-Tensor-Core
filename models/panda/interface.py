@@ -51,8 +51,13 @@ def main():
                         else:
                             test_script = os.path.join(current_dir, "tests", "test_matmul.py")
                         
+                        args = ["python", test_script]
+
+                        if "--verbose" in tokens:
+                            args.append("--verbose")
+                        
                         try:
-                            subprocess.run(["python", test_script], check=True)
+                            subprocess.run(args, check=True)
                         except subprocess.CalledProcessError as e:
                             print(f"Error running tests: {e}")
                         except FileNotFoundError:
@@ -82,8 +87,9 @@ def main():
                     elif command == "help":
                         print("\nCommands:")
                         print("  help             - See Available Commands.")
-                        print("  test             - Run a Single Test.")
-                        print("  test --suite     - Run the Test Suite.")
+                        print("  test             - Run a Single Test without detailed tile output.")
+                        print("  test --verbose   - Run a Single Test with detailed tile output.")
+                        print("  test --suite     - Run the complete Test Suite.")
                         print("  config           - Display current configuration.")
                         print("  config --edit    - Edit the configuration file.")
                         print("  q                - Quit.\n")
