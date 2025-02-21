@@ -175,20 +175,25 @@ PerformanceMetrics SIMDEngine::getPerformanceMetrics(double clock_frequency_hz) 
     size_t macs_per_tile = tile_size * tile_size * tile_size;
     size_t total_MACs = total_tiles * macs_per_tile;
     
-    // Calculate Throughput: Total MACs divided by Total Run Time in Seconds
+    size_t total_FLOPs = 2 * total_MACs;
+    
+    // Calculate Throughput: Total FLOPs divided by Total Run Time in Seconds
     double system_time_sec = metrics.system_latency_ns * 1e-9;
-    metrics.throughput_ops = (system_time_sec > 0) ? (static_cast<double>(total_MACs) / system_time_sec) : 0.0;
+    metrics.throughput_ops = (system_time_sec > 0) ? (static_cast<double>(total_FLOPs) / system_time_sec) : 0.0;
     
     // Estimate Memory Bandwidth
     // For Each Tile, the Transferred Data Includes:
     //   - Weight Tile: num_bits * (tile_size^2) bytes.
     //   - Activation Tile: tile_size^2 * sizeof(int16_t) = 2 * (tile_size^2) bytes.
-    //   - Result tile: tile_size^2 * sizeof(int32_t) = 4 * (tile_size^2) bytes.
+    //   - Result Tile: tile_size^2 * sizeof(int32_t) = 4 * (tile_size^2) bytes.
     size_t num_bits = weight_mem->getNumBits();
     size_t bytes_per_tile = tile_size * tile_size * (num_bits + 2 + 4); 
     size_t total_bytes = total_tiles * bytes_per_tile;
     
     metrics.memory_bandwidth_bytes_per_sec = (system_time_sec > 0) ? (total_bytes / system_time_sec) : 0.0;
+    
+    // Compute Arithmetic Intensity (FLOPs per Byte)
+    metrics.arithmetic_intensity = (total_bytes > 0) ? (static_cast<double>(total_FLOPs) / total_bytes) : 0.0;
     
     return metrics;
 }

@@ -40,7 +40,8 @@ PYBIND11_MODULE(panda, m) {
     py::class_<panda::PerformanceMetrics>(m, "PerformanceMetrics")
         .def_readonly("system_latency_ns", &panda::PerformanceMetrics::system_latency_ns)
         .def_readonly("throughput_ops", &panda::PerformanceMetrics::throughput_ops)
-        .def_readonly("memory_bandwidth_bytes_per_sec", &panda::PerformanceMetrics::memory_bandwidth_bytes_per_sec);
+        .def_readonly("memory_bandwidth_bytes_per_sec", &panda::PerformanceMetrics::memory_bandwidth_bytes_per_sec)
+        .def_readonly("arithmetic_intensity", &panda::PerformanceMetrics::arithmetic_intensity);
 
     // Bind the SIMDEngine 
     py::class_<panda::SIMDEngine>(m, "SIMDEngine")

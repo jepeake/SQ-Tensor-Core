@@ -105,13 +105,13 @@ def print_system_stats(stats, indent: int = 0):
 
 def format_throughput(ops):
     if ops >= 1e9:
-        return f"{ops / 1e9:.2f} Gops/s"
+        return f"{ops / 1e9:.2f} GFLOPs/s"
     elif ops >= 1e6:
-        return f"{ops / 1e6:.2f} Mops/s"
+        return f"{ops / 1e6:.2f} MFLOPs/s"
     elif ops >= 1e3:
-        return f"{ops / 1e3:.2f} Kops/s"
+        return f"{ops / 1e3:.2f} KFLOPs/s"
     else:
-        return f"{ops:.2f} ops/s"
+        return f"{ops:.2f} FLOPs/s"
 
 def format_bandwidth(bps):
     if bps >= 1e9:
@@ -129,13 +129,15 @@ def print_performance_metrics(metrics, indent: int = 0):
     throughput_str = format_throughput(metrics.throughput_ops)
     bandwidth_str = format_bandwidth(metrics.memory_bandwidth_bytes_per_sec)
     latency_str = f"{metrics.system_latency_ns:.2f} ns"
+    arithmetic_intensity_str = f"{metrics.arithmetic_intensity:.2f} FLOPs/Byte"
 
     print(f"\n{indent_str}┌{'─' * 50}┐")
     print(f"{indent_str}│ Performance Metrics                              │")
     print(f"{indent_str}├{'─' * 50}┤")
     print(f"{indent_str}│ Overall Latency         : {latency_str:>15}        │")
-    print(f"{indent_str}│ Throughput              : {throughput_str:>15}        │")
+    print(f"{indent_str}│ Throughput              : {throughput_str:>15}     │")
     print(f"{indent_str}│ Memory Bandwidth        : {bandwidth_str:>15}        │")
+    print(f"{indent_str}│ Arithmetic Intensity    : {arithmetic_intensity_str:>15}        │")
     print(f"{indent_str}└{'─' * 50}┘")
 
 def print_grouped_pe_assignments_and_stats(engine: SIMDEngine, stats, matrix_size: int, tile_size: int):
