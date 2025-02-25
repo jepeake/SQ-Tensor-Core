@@ -160,13 +160,13 @@ Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16
 
 PerformanceMetrics SIMDEngine::getPerformanceMetrics(double clock_frequency_hz) const {
     PerformanceMetrics metrics;
-    
+
     double clock_period_ns = 1e9 / clock_frequency_hz;
-    
+
     // Overall Latency in ns
     double total_cycles = static_cast<double>(system_stats.total_parallel_cycles);
     metrics.system_latency_ns = total_cycles * clock_period_ns;
-    
+
     // Estimate Total Number of Tiles
     size_t num_tiles_dim = (matrix_rows + tile_size - 1) / tile_size;
     size_t total_tiles = num_tiles_dim * num_tiles_dim * num_tiles_dim;
@@ -176,25 +176,25 @@ PerformanceMetrics SIMDEngine::getPerformanceMetrics(double clock_frequency_hz) 
     size_t total_MACs = total_tiles * macs_per_tile;
     
     size_t total_FLOPs = 2 * total_MACs;
-    
+
     // Calculate Throughput: Total FLOPs divided by Total Run Time in Seconds
     double system_time_sec = metrics.system_latency_ns * 1e-9;
     metrics.throughput_ops = (system_time_sec > 0) ? (static_cast<double>(total_FLOPs) / system_time_sec) : 0.0;
-    
-    // Estimate Memory Bandwidth
-    // For Each Tile, the Transferred Data Includes:
-    //   - Weight Tile: num_bits * (tile_size^2) bytes.
-    //   - Activation Tile: tile_size^2 * sizeof(int16_t) = 2 * (tile_size^2) bytes.
-    //   - Result Tile: tile_size^2 * sizeof(int32_t) = 4 * (tile_size^2) bytes.
-    size_t num_bits = weight_mem->getNumBits();
-    size_t bytes_per_tile = tile_size * tile_size * (num_bits + 2 + 4); 
-    size_t total_bytes = total_tiles * bytes_per_tile;
-    
-    metrics.memory_bandwidth_bytes_per_sec = (system_time_sec > 0) ? (total_bytes / system_time_sec) : 0.0;
-    
-    // Compute Arithmetic Intensity (FLOPs per Byte)
-    metrics.arithmetic_intensity = (total_bytes > 0) ? (static_cast<double>(total_FLOPs) / total_bytes) : 0.0;
-    
+
+    // Effective Memory Traffic:
+    // -- Activations are loaded once per (tile_row, k) pair.
+    // -- Weight tiles are assumed to be part of a constant weight matrix and loaded once for the (k, tile_col) pair.
+    // -- Result tiles are written once.
+    size_t num_row_tiles = (matrix_rows + tile_size - 1) / tile_size;
+    size_t num_col_tiles = (matrix_cols + tile_size - 1) / tile_size;
+    size_t activation_bytes = num_row_tiles * num_col_tiles * tile_size * tile_size * sizeof(int16_t);
+    size_t weights_bytes = num_col_tiles * num_col_tiles * tile_size * tile_size * weight_mem->getNumBits() * sizeof(uint8_t);
+    size_t result_bytes = num_row_tiles * num_col_tiles * tile_size * tile_size * sizeof(int32_t);
+    size_t effective_total_bytes = activation_bytes + weights_bytes + result_bytes;
+
+    metrics.memory_bandwidth_bytes_per_sec = (system_time_sec > 0) ? (static_cast<double>(effective_total_bytes) / system_time_sec) : 0.0;
+    metrics.arithmetic_intensity = (effective_total_bytes > 0) ? (static_cast<double>(total_FLOPs) / effective_total_bytes) : 0.0;
+
     return metrics;
 }
 

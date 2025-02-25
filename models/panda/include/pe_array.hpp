@@ -33,16 +33,30 @@ public:
         // Timing Parameters
         const size_t L_mask = 1;  // Masking Stage Latency
         size_t L_add = static_cast<size_t>(std::ceil(std::log2(tile_size * num_bits)));
-        const size_t L_total = L_mask + L_add;  // Total Latency per Tile
+        const size_t L_total = L_mask + L_add;  // Total computation latency per tile.
+        // Memory load latency per tile – this is the time to load one tile from (off-chip) memory.
+        const size_t L_load = 3;
 
-        // Track Finish Time (Cycle Count) for Each PE
+        // Track finish time (cycle count) for each PE.
         std::vector<size_t> pe_last_finish(num_pes, 0);
         
-        // Schedule Each Tile Round-Robin on the Fixed Set of PEs
+        // Schedule each tile round-robin over the available PEs with double buffering.
+        // For the first tile on a given PE the effective cycle cost includes L_load + L_total.
+        // For subsequent tiles, the load stage is overlapped with the compute stage so
+        // the added cost is the maximum of the two (i.e. the longer stage).
         for (size_t i = 0; i < total_tiles; i++) {
             size_t pe_index = i % num_pes;
-            size_t start_cycle = i / num_pes;  // New Job Starts Each Cycle on a Given PE
-            size_t finish_time = start_cycle + L_total;
+            size_t current_cost = 0;
+            if (pe_last_finish[pe_index] == 0) {
+                // No previous tile: must pay both the memory load and the computation cost.
+                current_cost = L_load + L_total;
+            } else {
+                // Double buffering hides the load cost if the compute stage is longer.
+                current_cost = std::max(L_total, L_load);
+            }
+
+            size_t start_cycle = pe_last_finish[pe_index];
+            size_t finish_time = start_cycle + current_cost;
             
             const auto& work_item = tiles[i];
             
@@ -54,20 +68,12 @@ public:
                 activation_threshold
             );
             
-            // Update the Finish Time for the Assigned PE if Later than the Previous Finish Time.
-            if (finish_time > pe_last_finish[pe_index]) {
-                pe_last_finish[pe_index] = finish_time;
-            }
+            pe_last_finish[pe_index] = finish_time;
         }
         
         // Update Each PE's Stats to Reflect the Simulated Pipelined Total Cycles.
         for (size_t i = 0; i < num_pes; i++) {
-            if (pe_last_finish[i] > 0) {
-                pes[i]->set_simulated_total_cycles(pe_last_finish[i]);
-            } else {
-                // Ensure that Idle PEs are Recorded with Zero Cycles.
-                pes[i]->set_simulated_total_cycles(0);
-            }
+            pes[i]->set_simulated_total_cycles(pe_last_finish[i]);
         }
         
         return results;
