@@ -91,17 +91,17 @@ def print_pe_stats(pe_idx: int, stats, indent: int = 0):
 
 def print_system_stats(stats, indent: int = 0):
     indent_str = " " * indent
+    box_width = 50 
     
-    print(f"\n{indent_str}┌{'─' * 50}┐")
+    print(f"\n{indent_str}┌{'─' * box_width}┐")
     print(f"{indent_str}│ System Statistics (Parallel Execution)           │")
-    # print(f"{indent_str}├{'─' * 50}┤")
-    # print(f"{indent_str}│ Maximum Parallel Operations:                     │")
-    # print(f"{indent_str}│   ├─ Masking:  {stats.total_parallel_mask_ops:<4} cycles                       │")
-    # print(f"{indent_str}│   ├─ Shifting: {stats.total_parallel_shifts:<4} cycles                       │")
-    # print(f"{indent_str}│   └─ Addition: {stats.total_parallel_additions:<4} cycles                       │")
-    print(f"{indent_str}├{'─' * 50}┤")
-    print(f"{indent_str}│ Total Execution Time: {stats.total_parallel_cycles} cycles                  │")
-    print(f"{indent_str}└{'─' * 50}┘")
+    print(f"{indent_str}├{'─' * box_width}┤")
+    
+    content = f" Total Execution Time: {stats.total_parallel_cycles} cycles"
+    formatted_line = content.ljust(box_width)
+    
+    print(f"{indent_str}│{formatted_line}│")
+    print(f"{indent_str}└{'─' * box_width}┘")
 
 def format_throughput(ops):
     if ops >= 1e9:
@@ -312,13 +312,24 @@ def suppress_all_output():
             os.close(old_stdout_fd)
             os.close(old_stderr_fd)
 
-def run_matmul_test(matrix_size, tile_size, num_bits, activation_threshold=0, verbose=True):
+def run_matmul_test(matrix_size, tile_size, num_bits, activation_threshold=0, weight_sparsity=0.0, verbose=True):
+    # Generate weights with specified sparsity
     weights = np.random.randint(0, 15, size=(matrix_size, matrix_size), dtype=np.int8)
+    
+    # Apply sparsity by setting some values to zero
+    if weight_sparsity > 0:
+        sparsity_mask = np.random.choice(
+            [0, 1], 
+            size=weights.shape, 
+            p=[weight_sparsity, 1-weight_sparsity]
+        )
+        weights = weights * sparsity_mask
+        
     activations = np.random.randint(-128, 127, size=(matrix_size, matrix_size), dtype=np.int32)
 
     print("\nInput Matrices Summary")
     print("═" * 50)
-    print(f"Weight Matrix: shape {weights.shape}")
+    print(f"Weight Matrix: shape {weights.shape}, sparsity {weight_sparsity:.2f}")
     print(f"Activation Matrix: shape {activations.shape}")
 
     if verbose:
@@ -403,6 +414,7 @@ if __name__ == "__main__":
     matrix_size = config_data.get("matrix_size", 16)
     tile_size = config_data.get("tile_size", 4)
     num_bits = 4
+    weight_sparsity = config_data.get("weight_sparsity", 0.0)
 
     verbose = "--verbose" in sys.argv
-    run_matmul_test(matrix_size, tile_size, num_bits, verbose=verbose) 
+    run_matmul_test(matrix_size, tile_size, num_bits, weight_sparsity=weight_sparsity, verbose=verbose) 
