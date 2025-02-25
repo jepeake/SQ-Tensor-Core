@@ -195,6 +195,29 @@ PerformanceMetrics SIMDEngine::getPerformanceMetrics(double clock_frequency_hz) 
     metrics.memory_bandwidth_bytes_per_sec = (system_time_sec > 0) ? (static_cast<double>(effective_total_bytes) / system_time_sec) : 0.0;
     metrics.arithmetic_intensity = (effective_total_bytes > 0) ? (static_cast<double>(total_FLOPs) / effective_total_bytes) : 0.0;
 
+    // Calculate Hardware Costs
+    const double ADDER_ENERGY_PJ = 0.03;        // Energy per 8-bit adder in pJ
+    const double ADDER_AREA_UM2 = 36.0;         // Area per 8-bit adder in μm²
+    const double MASK_ENERGY_PJ = 0.0012;       // Energy per transmission gate + AND in pJ
+    const double MASK_AREA_UM2 = 1.4;           // Area per transmission gate + AND in μm²
+
+    // Calculate total hardware costs based on operation counts
+    size_t total_additions = 0;
+    size_t total_mask_ops = 0;
+    
+    for (const auto& pe_stat : system_stats.pe_stats) {
+        total_additions += pe_stat.total_additions;
+        total_mask_ops += pe_stat.total_mask_ops;
+    }
+    
+    metrics.adder_energy_pj = total_additions * ADDER_ENERGY_PJ;
+    metrics.mask_energy_pj = total_mask_ops * MASK_ENERGY_PJ;
+    metrics.adder_area_um2 = total_additions * ADDER_AREA_UM2;
+    metrics.mask_area_um2 = total_mask_ops * MASK_AREA_UM2;
+    
+    metrics.total_energy_pj = metrics.adder_energy_pj + metrics.mask_energy_pj;
+    metrics.total_area_um2 = metrics.adder_area_um2 + metrics.mask_area_um2;
+
     return metrics;
 }
 

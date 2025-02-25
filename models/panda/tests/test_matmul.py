@@ -123,22 +123,135 @@ def format_bandwidth(bps):
     else:
         return f"{bps:.2f} B/s"
 
-def print_performance_metrics(metrics, indent: int = 0):
+def print_performance_metrics(metrics, indent=0):
     indent_str = " " * indent
-
-    throughput_str = format_throughput(metrics.throughput_ops)
-    bandwidth_str = format_bandwidth(metrics.memory_bandwidth_bytes_per_sec)
-    latency_str = f"{metrics.system_latency_ns:.2f} ns"
-    arithmetic_intensity_str = f"{metrics.arithmetic_intensity:.2f} FLOPs/Byte"
-
-    print(f"\n{indent_str}┌{'─' * 50}┐")
-    print(f"{indent_str}│ Performance Metrics                              │")
-    print(f"{indent_str}├{'─' * 50}┤")
-    print(f"{indent_str}│ Overall Latency         : {latency_str:>15}        │")
-    print(f"{indent_str}│ Throughput              : {throughput_str:>15}     │")
-    print(f"{indent_str}│ Memory Bandwidth        : {bandwidth_str:>15}        │")
-    print(f"{indent_str}│ Arithmetic Intensity    : {arithmetic_intensity_str:>15}        │")
-    print(f"{indent_str}└{'─' * 50}┘")
+    print(f"{indent_str}Performance Metrics:")
+    print(f"{indent_str}  System Latency: {metrics.system_latency_ns/1e3:.2f} μs")
+    print(f"{indent_str}  Throughput: {metrics.throughput_ops/1e9:.2f} GFLOPS")
+    print(f"{indent_str}  Memory Bandwidth: {metrics.memory_bandwidth_bytes_per_sec/1e9:.2f} GB/s")
+    print(f"{indent_str}  Arithmetic Intensity: {metrics.arithmetic_intensity:.2f} FLOPS/Byte")
+    
+    # Hardware costs with automatic unit conversion
+    print(f"\n{indent_str}Hardware Costs:")
+    
+    # Energy conversions
+    total_energy = metrics.total_energy_pj
+    energy_unit = "pJ"
+    if total_energy > 1000000:
+        total_energy /= 1000000
+        energy_unit = "μJ"
+    elif total_energy > 1000:
+        total_energy /= 1000
+        energy_unit = "nJ"
+    
+    # Area conversions
+    total_area = metrics.total_area_um2
+    area_unit = "μm²"
+    if total_area > 1000000:
+        total_area /= 1000000
+        area_unit = "mm²"
+    elif total_area > 1000:
+        total_area /= 1000
+        area_unit = "mm² × 10⁻³"  # 1000 μm² = 0.001 mm²
+    
+    print(f"{indent_str}  Total Energy: {total_energy:.2f} {energy_unit}")
+    print(f"{indent_str}  Total Area: {total_area:.2f} {area_unit}")
+    
+    # Per-component breakdown with percentage
+    print(f"\n{indent_str}Cost Breakdown:")
+    
+    # For adder energy
+    adder_energy = metrics.adder_energy_pj
+    adder_energy_unit = "pJ"
+    if metrics.adder_energy_pj > 1000000:
+        adder_energy /= 1000000
+        adder_energy_unit = "μJ"
+    elif metrics.adder_energy_pj > 1000:
+        adder_energy /= 1000
+        adder_energy_unit = "nJ"
+    
+    # For mask energy
+    mask_energy = metrics.mask_energy_pj
+    mask_energy_unit = "pJ"
+    if metrics.mask_energy_pj > 1000000:
+        mask_energy /= 1000000
+        mask_energy_unit = "μJ"
+    elif metrics.mask_energy_pj > 1000:
+        mask_energy /= 1000
+        mask_energy_unit = "nJ"
+    
+    # For adder area
+    adder_area = metrics.adder_area_um2
+    adder_area_unit = "μm²"
+    if metrics.adder_area_um2 > 1000000:
+        adder_area /= 1000000
+        adder_area_unit = "mm²"
+    elif metrics.adder_area_um2 > 1000:
+        adder_area /= 1000
+        adder_area_unit = "mm² × 10⁻³"
+    
+    # For mask area
+    mask_area = metrics.mask_area_um2
+    mask_area_unit = "μm²"
+    if metrics.mask_area_um2 > 1000000:
+        mask_area /= 1000000
+        mask_area_unit = "mm²"
+    elif metrics.mask_area_um2 > 1000:
+        mask_area /= 1000
+        mask_area_unit = "mm² × 10⁻³"
+    
+    print(f"{indent_str}  Adder Energy: {adder_energy:.2f} {adder_energy_unit} ({metrics.adder_energy_pj/metrics.total_energy_pj*100:.1f}%)")
+    print(f"{indent_str}  Masking Energy: {mask_energy:.2f} {mask_energy_unit} ({metrics.mask_energy_pj/metrics.total_energy_pj*100:.1f}%)")
+    print(f"{indent_str}  Adder Area: {adder_area:.2f} {adder_area_unit} ({metrics.adder_area_um2/metrics.total_area_um2*100:.1f}%)")
+    print(f"{indent_str}  Masking Area: {mask_area:.2f} {mask_area_unit} ({metrics.mask_area_um2/metrics.total_area_um2*100:.1f}%)")
+    
+    # Calculate power consumption
+    system_time_sec = metrics.system_latency_ns * 1e-9
+    
+    # Dynamic power (from the energy values we already have)
+    dynamic_power_w = metrics.total_energy_pj * 1e-12 / system_time_sec if system_time_sec > 0 else 0
+    
+    # Static power estimation (based on area)
+    # Typical leakage power density for 65nm - 90nm process: ~0.2-0.3 W/mm²
+    # For more advanced nodes like 28nm or smaller: ~0.1 W/mm²
+    leakage_power_density = 0.1  # W/mm²
+    static_power_w = (metrics.total_area_um2 * 1e-6) * leakage_power_density  # Convert μm² to mm²
+    
+    # Total power
+    total_power_w = dynamic_power_w + static_power_w
+    
+    # Format power values appropriately
+    def format_power(power_w):
+        if power_w < 1e-6:
+            return f"{power_w * 1e9:.2f} nW"
+        elif power_w < 1e-3:
+            return f"{power_w * 1e6:.2f} μW"
+        elif power_w < 1:
+            return f"{power_w * 1e3:.2f} mW"
+        else:
+            return f"{power_w:.2f} W"
+    
+    print(f"\n{indent_str}Power Estimation:")
+    print(f"{indent_str}  Dynamic Power: {format_power(dynamic_power_w)} ({dynamic_power_w/total_power_w*100:.1f}%)")
+    print(f"{indent_str}  Static Power: {format_power(static_power_w)} ({static_power_w/total_power_w*100:.1f}%)")
+    print(f"{indent_str}  Total Power: {format_power(total_power_w)}")
+    
+    # Energy efficiency (FLOPS/Watt)
+    # Convert pJ to W: 1 W = 1 J/s = 10^12 pJ/s
+    flops_per_joule = metrics.throughput_ops / total_power_w if total_power_w > 0 else 0
+    
+    # Use appropriate unit based on magnitude
+    efficiency_value = flops_per_joule
+    efficiency_unit = "FLOPS/W"
+    
+    if efficiency_value >= 1e9:
+        efficiency_value /= 1e9
+        efficiency_unit = "GFLOPS/W"
+    elif efficiency_value >= 1e6:
+        efficiency_value /= 1e6
+        efficiency_unit = "MFLOPS/W"
+    
+    print(f"\n{indent_str}Energy Efficiency: {efficiency_value:.2f} {efficiency_unit}")
 
 def print_grouped_pe_assignments_and_stats(engine: SIMDEngine, stats, matrix_size: int, tile_size: int):
     num_row_tiles = (matrix_size + tile_size - 1) // tile_size

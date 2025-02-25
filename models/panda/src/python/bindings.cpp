@@ -41,7 +41,13 @@ PYBIND11_MODULE(panda, m) {
         .def_readonly("system_latency_ns", &panda::PerformanceMetrics::system_latency_ns)
         .def_readonly("throughput_ops", &panda::PerformanceMetrics::throughput_ops)
         .def_readonly("memory_bandwidth_bytes_per_sec", &panda::PerformanceMetrics::memory_bandwidth_bytes_per_sec)
-        .def_readonly("arithmetic_intensity", &panda::PerformanceMetrics::arithmetic_intensity);
+        .def_readonly("arithmetic_intensity", &panda::PerformanceMetrics::arithmetic_intensity)
+        .def_readonly("total_energy_pj", &panda::PerformanceMetrics::total_energy_pj)
+        .def_readonly("total_area_um2", &panda::PerformanceMetrics::total_area_um2)
+        .def_readonly("adder_energy_pj", &panda::PerformanceMetrics::adder_energy_pj)
+        .def_readonly("mask_energy_pj", &panda::PerformanceMetrics::mask_energy_pj)
+        .def_readonly("adder_area_um2", &panda::PerformanceMetrics::adder_area_um2)
+        .def_readonly("mask_area_um2", &panda::PerformanceMetrics::mask_area_um2);
 
     // Bind the SIMDEngine 
     py::class_<panda::SIMDEngine>(m, "SIMDEngine")

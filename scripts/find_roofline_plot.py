@@ -165,6 +165,23 @@ def plot_roofline(results: List[Dict], use_empirical_peaks: bool = True):
              f"Ridge Point: {ridge_point:.2f} FLOPS/Byte",
              bbox=dict(facecolor='white', alpha=0.7))
     
+    # Add energy efficiency plot
+    plt.figure(figsize=(10, 8))
+    energy_efficiency = [r["throughput_ops"] / (r["total_energy_pj"] * 1e-12) for r in results]
+    
+    plt.bar(range(len(matrix_sizes)), energy_efficiency)
+    plt.xlabel('Matrix Size')
+    plt.ylabel('Energy Efficiency (FLOPS/W)')
+    plt.title('Energy Efficiency vs Matrix Size')
+    plt.xticks(range(len(matrix_sizes)), [f"{size}×{size}" for size in matrix_sizes])
+    plt.grid(True, alpha=0.3)
+    
+    for i, eff in enumerate(energy_efficiency):
+        plt.text(i, eff + max(energy_efficiency)*0.02, f"{eff/1e9:.1f}", ha='center')
+    
+    plt.tight_layout()
+    plt.savefig('panda_energy_efficiency.png', dpi=300)
+    
     plt.tight_layout()
     plt.savefig('panda_roofline.png', dpi=300)
     plt.show()

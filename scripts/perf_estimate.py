@@ -11,7 +11,7 @@ class HardwareCosts:
         'add_32bit': 0.1,
         'mul_8bit': 0.2,
         'mul_32bit': 3.1,
-        'transmission_gate': 0.001,
+        'transmission_gate': 0.0012,
         'shift_8bit': 0.01, 
         'compare_4bit': 0.005  
     }
@@ -22,7 +22,7 @@ class HardwareCosts:
         'add_32bit': 137,
         'mul_8bit': 282,
         'mul_32bit': 3495,
-        'transmission_gate': 1, 
+        'transmission_gate': 1.4, 
         'shift_8bit': 15,  
         'compare_4bit': 8  
     }
