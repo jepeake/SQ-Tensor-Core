@@ -151,6 +151,7 @@ def print_performance_metrics(metrics, indent=0, num_pes=None):
     print(f"{indent_str}Performance Metrics:")
     print(f"{indent_str}  System Latency: {metrics.system_latency_ns/1e3:.2f} μs")
     print(f"{indent_str}  Throughput: {metrics.throughput_ops/1e9:.2f} GFLOPS")
+    print(f"{indent_str}  Ops/Cycle: {metrics.ops_per_cycle:.2f}")
     print(f"{indent_str}  Memory Bandwidth: {metrics.memory_bandwidth_bytes_per_sec/1e9:.2f} GB/s")
     print(f"{indent_str}  Arithmetic Intensity: {metrics.arithmetic_intensity:.2f} FLOPS/Byte")
     
@@ -188,8 +189,8 @@ def print_performance_metrics(metrics, indent=0, num_pes=None):
         area_unit = "mm² × 10⁻³"  # 1000 μm² = 0.001 mm²
     
     print(f"{indent_str}  Total Energy ({num_matmuls} matrix multiplies): {total_energy:.2f} {energy_unit}")
-    print(f"{indent_str}  Energy per matrix multiply: {energy_per_matmul:.2f} {energy_per_unit}")
-    print(f"{indent_str}  Hardware Area (fixed, independent of operations): {total_area:.2f} {area_unit}")
+    print(f"{indent_str}  Energy per Matrix Multiply: {energy_per_matmul:.2f} {energy_per_unit}")
+    print(f"{indent_str}  Hardware Area: {total_area:.2f} {area_unit}")
     
     # Print per-PE costs if num_pes is provided
     if num_pes is not None and num_pes > 0:

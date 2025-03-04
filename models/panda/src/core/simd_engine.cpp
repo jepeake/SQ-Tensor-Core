@@ -221,6 +221,9 @@ PerformanceMetrics SIMDEngine::getPerformanceMetrics(double clock_frequency_hz) 
     // Calculate Throughput: Total FLOPs divided by Total Run Time in Seconds
     double system_time_sec = metrics.system_latency_ns * 1e-9;
     metrics.throughput_ops = (system_time_sec > 0) ? (static_cast<double>(total_FLOPs) / system_time_sec) : 0.0;
+    
+    // Calculate Operations per Cycle: Total FLOPs divided by Total Cycles
+    metrics.ops_per_cycle = (total_cycles > 0) ? (static_cast<double>(total_FLOPs) / total_cycles) : 0.0;
 
     // Effective Memory Traffic - scales with number of matrix multiplications
     // -- Activations are loaded once per (tile_row, k) pair.
