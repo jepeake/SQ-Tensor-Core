@@ -11,6 +11,7 @@ namespace config {
 using json = nlohmann::json;
 
 int num_pes = 32;
+int num_matmuls = 1;  // Default to 1 matrix multiply
 
 void loadConfig(const std::string &filename) {
     std::ifstream file(filename);
@@ -24,6 +25,9 @@ void loadConfig(const std::string &filename) {
         if (j.contains("num_pes")) {
             num_pes = j["num_pes"].get<int>();
         }
+        if (j.contains("num_matmuls")) {
+            num_matmuls = j["num_matmuls"].get<int>();
+        }
     } catch (const std::exception &e) {
         std::cerr << "Error parsing config file: " << e.what() << std::endl;
     }
@@ -32,6 +36,7 @@ void loadConfig(const std::string &filename) {
 void saveConfig(const std::string &filename) {
     json j;
     j["num_pes"] = num_pes;
+    j["num_matmuls"] = num_matmuls;
     std::ofstream file(filename);
     if (!file) {
         std::cerr << "Unable to open config file for writing: " << filename << std::endl;

@@ -20,13 +20,54 @@ SIMDEngine::SIMDEngine(const std::string& weight_file) {
     matrix_cols = weight_mem->getNumCols();
 
     num_pes = config::num_pes;
+    num_matmuls = config::num_matmuls;
     pe_array = std::make_unique<PEArray>(num_pes, tile_size);
 }
 
 Tile<int32_t> SIMDEngine::compute(const std::vector<int16_t>& activations, int16_t activation_threshold) {
+    std::cout << "Running " << num_matmuls << " matrix multiplications..." << std::endl;
 
     system_stats.clear();
     
+    Tile<int32_t> result(matrix_rows, matrix_cols);
+
+    // Perform the first matrix multiplication to get the actual stats for a single operation
+    result = performSingleMatrixMultiply(activations, activation_threshold);
+    
+    // Store stats from a single matrix multiply
+    SystemStats single_matmul_stats = system_stats;
+    
+    // If we have more than one matrix multiply, scale only the cycle and operation counts
+    // but we don't multiply the PE stats directly as that would incorrectly scale area
+    if (num_matmuls > 1) {
+        std::cout << "Scaling cycle and operation counts for " << num_matmuls << " matrix multiplies..." << std::endl;
+        
+        // Scale the total cycle and operation counts
+        system_stats.total_parallel_cycles *= num_matmuls;
+        system_stats.total_parallel_mask_ops *= num_matmuls;
+        system_stats.total_parallel_shifts *= num_matmuls;
+        system_stats.total_parallel_additions *= num_matmuls;
+        
+        // For each PE's stats, we scale only the operation counts but not the hardware itself
+        for (auto& pe_stat : system_stats.pe_stats) {
+            pe_stat.total_cycles *= num_matmuls;
+            pe_stat.total_mask_ops *= num_matmuls;
+            pe_stat.total_shifts *= num_matmuls;
+            pe_stat.total_additions *= num_matmuls;
+            
+            // We don't scale these as they represent instantaneous hardware properties
+            // pe_stat.masking_operations stays the same
+            // pe_stat.shifting_operations stays the same
+            // pe_stat.addition_operations stays the same
+        }
+    }
+    
+    return result;
+}
+
+// Helper method to perform a single matrix multiplication
+// This contains the original compute method logic
+Tile<int32_t> SIMDEngine::performSingleMatrixMultiply(const std::vector<int16_t>& activations, int16_t activation_threshold) {
     Tile<int32_t> result(matrix_rows, matrix_cols);
 
     std::vector<std::vector<Tile<int16_t>>> activation_tiles; 
@@ -163,7 +204,7 @@ PerformanceMetrics SIMDEngine::getPerformanceMetrics(double clock_frequency_hz) 
 
     double clock_period_ns = 1e9 / clock_frequency_hz;
 
-    // Overall Latency in ns
+    // Overall Latency in ns - scales with number of matrix multiplications
     double total_cycles = static_cast<double>(system_stats.total_parallel_cycles);
     metrics.system_latency_ns = total_cycles * clock_period_ns;
 
@@ -173,7 +214,7 @@ PerformanceMetrics SIMDEngine::getPerformanceMetrics(double clock_frequency_hz) 
     
     // Total MAC Operations per Tile Multiplication
     size_t macs_per_tile = tile_size * tile_size * tile_size;
-    size_t total_MACs = total_tiles * macs_per_tile;
+    size_t total_MACs = total_tiles * macs_per_tile * num_matmuls;
     
     size_t total_FLOPs = 2 * total_MACs;
 
@@ -181,15 +222,15 @@ PerformanceMetrics SIMDEngine::getPerformanceMetrics(double clock_frequency_hz) 
     double system_time_sec = metrics.system_latency_ns * 1e-9;
     metrics.throughput_ops = (system_time_sec > 0) ? (static_cast<double>(total_FLOPs) / system_time_sec) : 0.0;
 
-    // Effective Memory Traffic:
+    // Effective Memory Traffic - scales with number of matrix multiplications
     // -- Activations are loaded once per (tile_row, k) pair.
     // -- Weight tiles are assumed to be part of a constant weight matrix and loaded once for the (k, tile_col) pair.
     // -- Result tiles are written once.
     size_t num_row_tiles = (matrix_rows + tile_size - 1) / tile_size;
     size_t num_col_tiles = (matrix_cols + tile_size - 1) / tile_size;
-    size_t activation_bytes = num_row_tiles * num_col_tiles * tile_size * tile_size * sizeof(int16_t);
-    size_t weights_bytes = num_col_tiles * num_col_tiles * tile_size * tile_size * weight_mem->getNumBits() * sizeof(uint8_t);
-    size_t result_bytes = num_row_tiles * num_col_tiles * tile_size * tile_size * sizeof(int32_t);
+    size_t activation_bytes = num_row_tiles * num_col_tiles * tile_size * tile_size * sizeof(int16_t) * num_matmuls;
+    size_t weights_bytes = num_col_tiles * num_col_tiles * tile_size * tile_size * weight_mem->getNumBits() * sizeof(uint8_t) * num_matmuls;
+    size_t result_bytes = num_row_tiles * num_col_tiles * tile_size * tile_size * sizeof(int32_t) * num_matmuls;
     size_t effective_total_bytes = activation_bytes + weights_bytes + result_bytes;
 
     metrics.memory_bandwidth_bytes_per_sec = (system_time_sec > 0) ? (static_cast<double>(effective_total_bytes) / system_time_sec) : 0.0;
@@ -201,7 +242,7 @@ PerformanceMetrics SIMDEngine::getPerformanceMetrics(double clock_frequency_hz) 
     const double MASK_ENERGY_PJ = 0.0012;       // Energy per transmission gate + AND in pJ
     const double MASK_AREA_UM2 = 1.4;           // Area per transmission gate + AND in μm²
 
-    // Calculate total hardware costs based on operation counts
+    // Get total operations across all matrix multiplications for energy calculation
     size_t total_additions = 0;
     size_t total_mask_ops = 0;
     
@@ -210,14 +251,17 @@ PerformanceMetrics SIMDEngine::getPerformanceMetrics(double clock_frequency_hz) 
         total_mask_ops += pe_stat.total_mask_ops;
     }
     
+    // Energy scales with the total number of operations (all matrix multiplications)
     metrics.adder_energy_pj = total_additions * ADDER_ENERGY_PJ;
     metrics.mask_energy_pj = total_mask_ops * MASK_ENERGY_PJ;
-    metrics.adder_area_um2 = total_additions * ADDER_AREA_UM2;
-    metrics.mask_area_um2 = total_mask_ops * MASK_AREA_UM2;
-    
     metrics.total_energy_pj = metrics.adder_energy_pj + metrics.mask_energy_pj;
+    
+    // Area calculation - does NOT scale with num_matmuls
+    // We need to divide the total operations by num_matmuls to get the hardware area
+    metrics.adder_area_um2 = (num_matmuls > 0) ? (total_additions / num_matmuls) * ADDER_AREA_UM2 : 0;
+    metrics.mask_area_um2 = (num_matmuls > 0) ? (total_mask_ops / num_matmuls) * MASK_AREA_UM2 : 0;
     metrics.total_area_um2 = metrics.adder_area_um2 + metrics.mask_area_um2;
-
+    
     return metrics;
 }
 

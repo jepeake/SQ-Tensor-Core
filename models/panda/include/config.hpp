@@ -5,6 +5,7 @@ namespace panda {
 namespace config {
 
 extern int num_pes;
+extern int num_matmuls;
 
 void loadConfig(const std::string &filename);
 

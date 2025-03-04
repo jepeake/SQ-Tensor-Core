@@ -14,7 +14,11 @@ private:
     size_t matrix_cols;
     size_t tile_size;
     size_t num_pes;
+    size_t num_matmuls;
     SystemStats system_stats;
+    
+    // Helper method to perform a single matrix multiplication
+    Tile<int32_t> performSingleMatrixMultiply(const std::vector<int16_t>& activations, int16_t activation_threshold);
     
 public:
     explicit SIMDEngine(const std::string& weight_file);
@@ -25,6 +29,7 @@ public:
     size_t getMatrixCols() const { return matrix_cols; }
     size_t getTileSize() const { return tile_size; }
     size_t getNumPEs() const { return num_pes; }
+    size_t getNumMatMuls() const { return num_matmuls; }
     
     PerformanceMetrics getPerformanceMetrics(double clock_frequency_hz) const;
 };

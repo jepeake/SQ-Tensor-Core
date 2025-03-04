@@ -60,6 +60,7 @@ PYBIND11_MODULE(panda, m) {
         .def("get_matrix_cols", &panda::SIMDEngine::getMatrixCols)
         .def("get_tile_size", &panda::SIMDEngine::getTileSize)
         .def("get_num_pes", &panda::SIMDEngine::getNumPEs)
+        .def("get_num_matmuls", &panda::SIMDEngine::getNumMatMuls)
         .def("get_performance_metrics", &panda::SIMDEngine::getPerformanceMetrics,
              py::arg("clock_frequency_hz"));
 }

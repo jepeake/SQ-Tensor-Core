@@ -7,6 +7,7 @@ import os
 import contextlib
 import sys
 import json
+import math
 
 # ----- Pretty Printing -----
 
@@ -48,19 +49,36 @@ def print_matrix_info(engine: SIMDEngine):
     matrix_cols = engine.get_matrix_cols()
     tile_size = engine.get_tile_size()
     num_pes = engine.get_num_pes()
+    num_matmuls = engine.get_num_matmuls()
+    
+    print("\nSystem Configuration:")
+    print("═" * 50)
+    print(f"Matrix Size: {matrix_rows}x{matrix_cols}")
+    print(f"Tile Size: {tile_size}x{tile_size}")
+    print(f"Number of Processing Elements: {num_pes}")
+    print(f"Number of Matrix Multiplications: {num_matmuls}")
     
     num_row_tiles = (matrix_rows + tile_size - 1) // tile_size
     num_col_tiles = (matrix_cols + tile_size - 1) // tile_size
     total_tiles = num_row_tiles * num_col_tiles
     
-    print("\nMatrix Configuration")
+    print(f"\nWorkload Information:")
     print("═" * 50)
-    print(f"Matrix Size: {matrix_rows}x{matrix_cols}")
-    print(f"Tile Size: {tile_size}x{tile_size}")
-    print(f"Number of Row Tiles: {num_row_tiles}")
-    print(f"Number of Column Tiles: {num_col_tiles}")
-    print(f"Total Tiles: {total_tiles}")
-    print(f"Available PEs: {num_pes}")
+    print(f"Total Tiles: {total_tiles} ({num_row_tiles}x{num_col_tiles})")
+    total_matmul_tiles = total_tiles * total_tiles * num_matmuls
+    print(f"Total Matmul Tiles: {total_matmul_tiles} (across {num_matmuls} matrix multiplications)")
+    
+    # Calculate Total PEs Needed
+    pes_needed = total_tiles * total_tiles
+    
+    print(f"PEs for Full Parallel Processing: {pes_needed}")
+    if num_pes < pes_needed:
+        utilization = 100.0
+        reuse_factor = math.ceil(pes_needed / num_pes)
+        print(f"PE Reuse Factor: {reuse_factor}x")
+    else:
+        utilization = (pes_needed / num_pes) * 100.0
+        print(f"PE Utilization: {utilization:.2f}%")
 
 def print_tile_assignment(tile_row: int, tile_col: int, k: int, pe_idx: int, indent: int = 0):
     indent_str = " " * indent
@@ -125,6 +143,11 @@ def format_bandwidth(bps):
 
 def print_performance_metrics(metrics, indent=0, num_pes=None):
     indent_str = " " * indent
+    
+    # Get number of matrix multiplies
+    engine = SIMDEngine("weight_bits.bin")
+    num_matmuls = engine.get_num_matmuls()
+    
     print(f"{indent_str}Performance Metrics:")
     print(f"{indent_str}  System Latency: {metrics.system_latency_ns/1e3:.2f} μs")
     print(f"{indent_str}  Throughput: {metrics.throughput_ops/1e9:.2f} GFLOPS")
@@ -144,6 +167,16 @@ def print_performance_metrics(metrics, indent=0, num_pes=None):
         total_energy /= 1000
         energy_unit = "nJ"
     
+    # Calculate energy per matrix multiply
+    energy_per_matmul = metrics.total_energy_pj / num_matmuls
+    energy_per_unit = "pJ"
+    if energy_per_matmul > 1000000:
+        energy_per_matmul /= 1000000
+        energy_per_unit = "μJ"
+    elif energy_per_matmul > 1000:
+        energy_per_matmul /= 1000
+        energy_per_unit = "nJ"
+    
     # Area conversions
     total_area = metrics.total_area_um2
     area_unit = "μm²"
@@ -154,15 +187,27 @@ def print_performance_metrics(metrics, indent=0, num_pes=None):
         total_area /= 1000
         area_unit = "mm² × 10⁻³"  # 1000 μm² = 0.001 mm²
     
-    print(f"{indent_str}  Total Energy: {total_energy:.2f} {energy_unit}")
-    print(f"{indent_str}  Total Area: {total_area:.2f} {area_unit}")
+    print(f"{indent_str}  Total Energy ({num_matmuls} matrix multiplies): {total_energy:.2f} {energy_unit}")
+    print(f"{indent_str}  Energy per matrix multiply: {energy_per_matmul:.2f} {energy_per_unit}")
+    print(f"{indent_str}  Hardware Area (fixed, independent of operations): {total_area:.2f} {area_unit}")
     
     # Print per-PE costs if num_pes is provided
     if num_pes is not None and num_pes > 0:
-        per_pe_energy = metrics.total_energy_pj / num_pes
+        per_pe_energy = energy_per_matmul / num_pes
+        per_pe_energy_unit = energy_per_unit
+        
         per_pe_area = metrics.total_area_um2 / num_pes
-        print(f"{indent_str}  Energy per PE: {per_pe_energy:.2f} pJ")
-        print(f"{indent_str}  Area per PE: {per_pe_area:.2f} μm²")
+        per_pe_area_unit = "μm²"
+        if per_pe_area > 1000000:
+            per_pe_area /= 1000000
+            per_pe_area_unit = "mm²"
+        elif per_pe_area > 1000:
+            per_pe_area /= 1000
+            per_pe_area_unit = "mm² × 10⁻³"
+            
+        print(f"\n{indent_str}Per-PE Costs:")
+        print(f"{indent_str}  Energy per PE per matrix multiply: {per_pe_energy:.2f} {per_pe_energy_unit}")
+        print(f"{indent_str}  Area per PE: {per_pe_area:.2f} {per_pe_area_unit}")
 
     # Per-component breakdown with percentage
     print(f"\n{indent_str}Cost Breakdown:")
@@ -422,6 +467,14 @@ if __name__ == "__main__":
     tile_size = config_data.get("tile_size", 4)
     num_bits = 4
     weight_sparsity = config_data.get("weight_sparsity", 0.0)
+    num_matmuls = config_data.get("num_matmuls", 1)  # Default to 1 matrix multiply
 
     verbose = "--verbose" in sys.argv
+    print(f"Configuration from {config_path}:")
+    print(f"  - Matrix Size: {matrix_size}x{matrix_size}")
+    print(f"  - Tile Size: {tile_size}")
+    print(f"  - Weight Bits: {num_bits}")
+    print(f"  - Weight Sparsity: {weight_sparsity}")
+    print(f"  - Number of Matrix Multiplications: {num_matmuls}")
+    
     run_matmul_test(matrix_size, tile_size, num_bits, weight_sparsity=weight_sparsity, verbose=verbose) 
