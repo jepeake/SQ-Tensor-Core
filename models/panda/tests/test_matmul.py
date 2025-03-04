@@ -123,7 +123,7 @@ def format_bandwidth(bps):
     else:
         return f"{bps:.2f} B/s"
 
-def print_performance_metrics(metrics, indent=0):
+def print_performance_metrics(metrics, indent=0, num_pes=None):
     indent_str = " " * indent
     print(f"{indent_str}Performance Metrics:")
     print(f"{indent_str}  System Latency: {metrics.system_latency_ns/1e3:.2f} μs")
@@ -157,6 +157,13 @@ def print_performance_metrics(metrics, indent=0):
     print(f"{indent_str}  Total Energy: {total_energy:.2f} {energy_unit}")
     print(f"{indent_str}  Total Area: {total_area:.2f} {area_unit}")
     
+    # Print per-PE costs if num_pes is provided
+    if num_pes is not None and num_pes > 0:
+        per_pe_energy = metrics.total_energy_pj / num_pes
+        per_pe_area = metrics.total_area_um2 / num_pes
+        print(f"{indent_str}  Energy per PE: {per_pe_energy:.2f} pJ")
+        print(f"{indent_str}  Area per PE: {per_pe_area:.2f} μm²")
+
     # Per-component breakdown with percentage
     print(f"\n{indent_str}Cost Breakdown:")
     
@@ -395,7 +402,7 @@ def run_matmul_test(matrix_size, tile_size, num_bits, activation_threshold=0, we
     print_system_stats(stats, indent=2)
     clock_frequency_hz = 1e9  # 1 GHz
     performance_metrics = engine.get_performance_metrics(clock_frequency_hz)
-    print_performance_metrics(performance_metrics, indent=2)
+    print_performance_metrics(performance_metrics, indent=2, num_pes=engine.get_num_pes())
 
     return result_array, software_reference, stats
 
