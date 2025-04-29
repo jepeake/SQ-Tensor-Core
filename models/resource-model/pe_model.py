@@ -595,6 +595,255 @@ def plot_combined_heatmap(tile_sizes: list, weight_bits_list: list, combined_res
     plt.savefig('sq_tc_combined_heatmap.png', format='png', dpi=300, bbox_inches='tight')
     plt.show()
 
+def plot_component_breakdown(tile_dim: int = 4, weight_bits: int = 4, activation_bits: int = 8):
+    """Plot energy and area breakdown by component for SQ-TC"""
+    plt.style.use('seaborn-v0_8-paper')
+    
+    # Calculate costs
+    pe_costs = calculate_pe_costs(tile_dim=tile_dim, weight_bits=weight_bits, activation_bits=activation_bits)
+    sq_tc_components = pe_costs['sq_tc']['components']
+    
+    # Extract component data
+    components = list(sq_tc_components.keys())
+    energy_values = [sq_tc_components[comp]['energy'] for comp in components]
+    area_values = [sq_tc_components[comp]['area'] for comp in components]
+    
+    # Create a figure with two subplots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), dpi=300)
+    
+    # Energy breakdown pie chart
+    colors = ['#808080', '#6F9EE3']
+    
+    # Add percentage to labels
+    total_energy = sum(energy_values)
+    energy_labels = [f"{comp}\n({value/total_energy:.1%})" for comp, value in zip(components, energy_values)]
+    
+    ax1.pie(energy_values, labels=energy_labels, colors=colors, autopct='%.1f%%', 
+            startangle=90, wedgeprops={'edgecolor': 'w', 'linewidth': 1})
+    
+    # Format energy plot
+    ax1.set_title('SQ-TC Energy Breakdown', fontsize=14, fontweight='bold')
+    
+    # Area breakdown pie chart
+    total_area = sum(area_values)
+    area_labels = [f"{comp}\n({value/total_area:.1%})" for comp, value in zip(components, area_values)]
+    
+    ax2.pie(area_values, labels=area_labels, colors=colors, autopct='%.1f%%', 
+            startangle=90, wedgeprops={'edgecolor': 'w', 'linewidth': 1})
+    
+    # Format area plot
+    ax2.set_title('SQ-TC Area Breakdown', fontsize=14, fontweight='bold')
+    
+    # Add subtitle with configuration
+    plt.figtext(0.5, 0.01, f"Tile Dim: {tile_dim}×{tile_dim}, Weight Bits: {weight_bits}, Activation Bits: {activation_bits}, Sparsity: 80%",
+               ha="center", fontsize=10)
+    
+    # Adjust layout
+    plt.tight_layout(rect=[0, 0.05, 1, 0.95])
+    plt.savefig('sq_tc_component_breakdown.png', format='png', dpi=300, bbox_inches='tight')
+    plt.show()
+
+def plot_sparsity_impact(tile_dim: int = 4, weight_bits: int = 4, activation_bits: int = 8):
+    """Plot how different sparsity levels affect SQ-TC performance"""
+    plt.style.use('seaborn-v0_8-paper')
+    
+    # Test different sparsity levels
+    sparsity_levels = [0.0, 0.2, 0.4, 0.6, 0.8, 0.9, 0.95, 0.99]
+    results = []
+    
+    # Store original sparsity
+    original_sparsity = None
+    
+    # Temporarily modify the sparsity in calculate_pe_costs
+    for sparsity in sparsity_levels:
+        # Inject sparsity for this calculation
+        global_vars = globals()
+        
+        # Find the calculate_pe_costs function and temporarily modify it
+        original_code = calculate_pe_costs.__code__
+        original_code_str = original_code.__str__()
+        
+        # Store the original sparsity value first time
+        if original_sparsity is None:
+            # Extract the current sparsity value
+            import re
+            match = re.search(r'sparsity\s*=\s*([0-9.]+)', original_code_str)
+            if match:
+                original_sparsity = float(match.group(1))
+        
+        # Create a modified version of calculate_pe_costs with the desired sparsity
+        # Since we can't directly modify the function, we'll use a wrapper
+        def modified_calculate_pe_costs(tile_dim=tile_dim, weight_bits=weight_bits, activation_bits=activation_bits):
+            elements_per_tile = tile_dim * tile_dim
+            base_adders = tile_dim * weight_bits - 1
+            
+            # Use the current sparsity from the loop
+            current_sparsity = sparsity
+            
+            active_ratio = 1 - current_sparsity
+            compressed_adders = int(base_adders * active_ratio)  # Reduce Adders Based on Sparsity
+            
+            sq_tc_components = {
+                'transmission_gates': {
+                    'count': elements_per_tile * weight_bits,
+                    'energy': elements_per_tile * weight_bits * HardwareCosts.ENERGY['transmission_gate'] * active_ratio,
+                    'area': elements_per_tile * weight_bits * HardwareCosts.AREA['transmission_gate']
+                },
+                'adder_tree': {
+                    'count': compressed_adders,
+                    'energy': compressed_adders * HardwareCosts.ENERGY['add_8bit'],
+                    'area': compressed_adders * HardwareCosts.AREA['add_8bit']
+                }
+            }
+            
+            sq_tc_total_energy = sum(comp['energy'] for comp in sq_tc_components.values())
+            sq_tc_total_area = sum(comp['area'] for comp in sq_tc_components.values())
+            
+            return {
+                'components': sq_tc_components,
+                'total_energy': sq_tc_total_energy,
+                'total_area': sq_tc_total_area
+            }
+        
+        # Calculate with the modified function
+        result = modified_calculate_pe_costs()
+        results.append({
+            'sparsity': sparsity,
+            'energy': result['total_energy'],
+            'area': result['total_area']
+        })
+    
+    # Create a figure with two subplots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), dpi=300)
+    
+    # Energy vs Sparsity plot
+    ax1.plot([r['sparsity'] for r in results], [r['energy'] for r in results], 
+             color='#808080', marker='o', markersize=5)
+    
+    # Format energy plot
+    ax1.set_title('SQ-TC Energy vs Sparsity', fontsize=14, fontweight='bold')
+    ax1.set_xlabel('Sparsity', fontsize=12)
+    ax1.set_ylabel('Energy (pJ)', fontsize=12)
+    ax1.grid(True, alpha=0.3, linestyle='--')
+    ax1.tick_params(axis='both', which='major', labelsize=10)
+    
+    # Area vs Sparsity plot
+    ax2.plot([r['sparsity'] for r in results], [r['area'] for r in results], 
+             color='#808080', marker='o', markersize=5)
+    
+    # Format area plot
+    ax2.set_title('SQ-TC Area vs Sparsity', fontsize=14, fontweight='bold')
+    ax2.set_xlabel('Sparsity', fontsize=12)
+    ax2.set_ylabel('Area (μm²)', fontsize=12)
+    ax2.grid(True, alpha=0.3, linestyle='--')
+    ax2.tick_params(axis='both', which='major', labelsize=10)
+    
+    # Add subtitle with configuration
+    plt.figtext(0.5, 0.01, f"Tile Dim: {tile_dim}×{tile_dim}, Weight Bits: {weight_bits}, Activation Bits: {activation_bits}",
+               ha="center", fontsize=10)
+    
+    # Adjust layout
+    plt.tight_layout(rect=[0, 0.05, 1, 0.95])
+    plt.savefig('sq_tc_sparsity_impact.png', format='png', dpi=300, bbox_inches='tight')
+    plt.show()
+
+def plot_perf_comparison_radar(tile_dim: int = 4, weight_bits: int = 4, activation_bits: int = 8):
+    """Plot a radar chart comparing all architectures across multiple metrics"""
+    plt.style.use('seaborn-v0_8-paper')
+    
+    # Calculate costs
+    pe_costs = calculate_pe_costs(tile_dim=tile_dim, weight_bits=weight_bits, activation_bits=activation_bits)
+    
+    # Extract comparison metrics
+    architectures = ['SQ-TC', 'MAC', 'Bit-Serial', 'Bit-Slice', 'Bit-Interleaved', 'Bit-Column']
+    
+    # Get the metrics for each architecture
+    energy_values = [
+        pe_costs['sq_tc']['total_energy'],
+        pe_costs['mac']['total_energy'],
+        pe_costs['bit_serial']['total_energy'],
+        pe_costs['bit_slice']['total_energy'],
+        pe_costs['bit_interleaved']['total_energy'],
+        pe_costs['bit_column']['total_energy']
+    ]
+    
+    area_values = [
+        pe_costs['sq_tc']['total_area'],
+        pe_costs['mac']['total_area'],
+        pe_costs['bit_serial']['total_area'],
+        pe_costs['bit_slice']['total_area'],
+        pe_costs['bit_interleaved']['total_area'],
+        pe_costs['bit_column']['total_area']
+    ]
+    
+    # Normalize values between 0 and 1 (lower is better)
+    def normalize_inverse(values):
+        max_val = max(values)
+        return [1 - (val / max_val) for val in values]
+    
+    norm_energy = normalize_inverse(energy_values)
+    norm_area = normalize_inverse(area_values)
+    
+    # Compute an "efficiency" metric (1/energy * 1/area)
+    efficiency = [1/(e+0.001) * 1/(a+0.001) for e, a in zip(energy_values, area_values)]
+    norm_efficiency = [e/max(efficiency) for e in efficiency]
+    
+    # Compute a "density" metric (ops per area)
+    # We'll use 1/area as a proxy for this
+    density = [1/(a+0.001) for a in area_values]
+    norm_density = [d/max(density) for d in density]
+    
+    # Create radar chart
+    categories = ['Energy Efficiency', 'Area Efficiency', 'Compute Density', 'Overall Efficiency']
+    
+    fig = plt.figure(figsize=(10, 8), dpi=300)
+    ax = fig.add_subplot(111, polar=True)
+    
+    # Number of categories
+    N = len(categories)
+    
+    # Angle of each axis
+    angles = [n / float(N) * 2 * np.pi for n in range(N)]
+    angles += angles[:1]  # Close the loop
+    
+    # Initialize the radar plot
+    ax.set_theta_offset(np.pi / 2)
+    ax.set_theta_direction(-1)
+    
+    # Set the labels for each axis
+    plt.xticks(angles[:-1], categories, fontsize=12)
+    
+    # Draw axis lines for each angle and label
+    ax.set_rlabel_position(0)
+    plt.yticks([0.25, 0.5, 0.75], ["0.25", "0.5", "0.75"], color="grey", size=10)
+    plt.ylim(0, 1)
+    
+    # Define colors for each architecture
+    colors = ['#808080', '#8B7CC8', '#6F9EE3', '#B784D9', '#E091C8', '#4B6BCC']
+    
+    # Plot each architecture
+    for i, arch in enumerate(architectures):
+        values = [norm_energy[i], norm_area[i], norm_density[i], norm_efficiency[i]]
+        values += values[:1]  # Close the loop
+        
+        ax.plot(angles, values, linewidth=2, linestyle='solid', color=colors[i], label=arch)
+        ax.fill(angles, values, color=colors[i], alpha=0.1)
+    
+    # Add legend
+    plt.legend(loc='upper right', bbox_to_anchor=(0.1, 0.1), fontsize=10)
+    
+    # Add title
+    plt.title('Architecture Comparison', size=15, y=1.1, fontweight='bold')
+    
+    # Add subtitle with configuration
+    plt.figtext(0.5, 0.01, f"Tile Dim: {tile_dim}×{tile_dim}, Weight Bits: {weight_bits}, Activation Bits: {activation_bits}, Sparsity: 80%",
+               ha="center", fontsize=10)
+    
+    # Adjust layout
+    plt.tight_layout(rect=[0, 0.05, 1, 0.95])
+    plt.savefig('architecture_radar_comparison.png', format='png', dpi=300, bbox_inches='tight')
+    plt.show()
+
 if __name__ == "__main__":
     print("Analysis for a Single PE:")
     results = calculate_pe_costs(tile_dim=4, weight_bits=4, activation_bits=8)
@@ -606,15 +855,24 @@ if __name__ == "__main__":
     plot_scaling_analysis(matrix_sizes, scaling_results)
     
     print("\nAnalysing SQ-TC vs Tile Size...")
-    tile_sizes = [2, 4, 8, 16, 32]
+    tile_sizes = [2, 4, 8, 16, 32, 64, 128, 256]
     tile_scaling_results = analyse_tile_scaling(tile_sizes)
     plot_tile_size_scaling(tile_sizes, tile_scaling_results)
     
     print("\nAnalysing SQ-TC vs Weight Bits...")
-    weight_bits_list = [1, 2, 4, 8, 16]
+    weight_bits_list = [1, 2, 4, 8, 16, 32]
     weight_bits_results = analyse_weight_bits_scaling(weight_bits_list)
     plot_weight_bits_scaling(weight_bits_list, weight_bits_results)
     
     print("\nAnalysing Combined Scaling (Tile Size vs Weight Bits)...")
     combined_results = analyse_combined_scaling(tile_sizes, weight_bits_list)
     plot_combined_heatmap(tile_sizes, weight_bits_list, combined_results)
+    
+    print("\nAnalysing Component Breakdown for SQ-TC...")
+    plot_component_breakdown()
+    
+    print("\nAnalysing Impact of Sparsity on SQ-TC...")
+    plot_sparsity_impact()
+    
+    print("\nComparing Architectures with Radar Chart...")
+    plot_perf_comparison_radar()
