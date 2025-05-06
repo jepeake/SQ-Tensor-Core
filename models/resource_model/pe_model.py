@@ -2,6 +2,10 @@ import numpy as np
 from dataclasses import dataclass
 from typing import Dict, Tuple
 import matplotlib.pyplot as plt
+import os
+
+results_dir = os.path.join(os.path.dirname(__file__), 'results')
+os.makedirs(results_dir, exist_ok=True)
 
 @dataclass
 class HardwareCosts:
@@ -38,8 +42,26 @@ class HardwareCosts:
         'bit_acc': 25,        
         'bit_mux': 3         
     }
+    
+    # Latency costs in ns (approximate)
+    LATENCY = {
+        'add_8bit': 0.5,
+        'add_32bit': 1.2,
+        'mul_8bit': 1.0,
+        'mul_32bit': 3.0,
+        'transmission_gate': 0.1,
+        'shift_8bit': 0.3,
+        'compare_4bit': 0.2,
+        'mux_8bit': 0.3,
+        
+        'bit_mul': 0.15,
+        'bit_add': 0.2,
+        'bit_acc': 0.3,
+        'bit_mux': 0.1
+    }
 
-def calculate_bit_serial_mac_costs(weight_bits: int = 4, activation_bits: int = 8) -> Dict:
+def calculate_bit_serial_mac_costs(weight_bits: int = 4, activation_bits: int = 8, tile_dim: int = 4) -> Dict:
+    """Calculate costs for bit-serial MAC processing a single element (needs to be replicated per tile element)"""
     # - Single Bit Multiplier
     # - Shift Operation
     # - Adder for Accumulation
@@ -49,35 +71,48 @@ def calculate_bit_serial_mac_costs(weight_bits: int = 4, activation_bits: int = 
         'bit_multiplier': {
             'count': 1,  # Single Bit Multiplier
             'energy': HardwareCosts.ENERGY['bit_mul'],
-            'area': HardwareCosts.AREA['bit_mul']
+            'area': HardwareCosts.AREA['bit_mul'],
+            'latency': HardwareCosts.LATENCY['bit_mul']
         },
         'shifter': {
             'count': 1,
             'energy': HardwareCosts.ENERGY['shift_8bit'],
-            'area': HardwareCosts.AREA['shift_8bit']
+            'area': HardwareCosts.AREA['shift_8bit'],
+            'latency': HardwareCosts.LATENCY['shift_8bit']
         },
         'accumulator': {
             'count': 1,
             'energy': HardwareCosts.ENERGY['bit_acc'],
-            'area': HardwareCosts.AREA['bit_acc']
+            'area': HardwareCosts.AREA['bit_acc'],
+            'latency': HardwareCosts.LATENCY['bit_acc']
         }
     }
     
     # Account for Weight_Bits Cycles of Operation
-    # Energy Scales with Cycles, Area Remains the Same
+    # Energy and Latency Scale with Cycles, Area Remains the Same
     cycle_factor = weight_bits
     
     total_area = sum(comp['area'] for comp in components.values())
     total_energy = sum(comp['energy'] for comp in components.values()) * cycle_factor
     
+    # Critical path per cycle: multiplier -> accumulator
+    cycle_latency = components['bit_multiplier']['latency'] + components['accumulator']['latency']
+    total_latency = cycle_latency * cycle_factor
+    
+    # For a whole tile computation we'd need tile_dim^2 of these operating in parallel
+    # The latency remains the same since they all operate in parallel
+    
     return {
-        'config': f"W{weight_bits}A{activation_bits}",
+        'config': f"W{weight_bits}A{activation_bits} SingleElement",
         'components': components,
         'total_energy': total_energy,
-        'total_area': total_area
+        'total_area': total_area,
+        'total_latency': total_latency,
+        'elements_needed': tile_dim * tile_dim  # Number of these needed for full tile
     }
 
-def calculate_bit_slice_mac_costs(weight_bits: int = 4, activation_bits: int = 8) -> Dict:
+def calculate_bit_slice_mac_costs(weight_bits: int = 4, activation_bits: int = 8, tile_dim: int = 4) -> Dict:
+    """Calculate costs for bit-slice MAC processing a single element (needs to be replicated per tile element)"""
     # - Separate Multipliers for High/Low Bits
     # - Shift Operation
     # - Adder for Accumulation
@@ -89,54 +124,79 @@ def calculate_bit_slice_mac_costs(weight_bits: int = 4, activation_bits: int = 8
         'bit_multiplier': {
             'count': 1,  # One Multiplier Reused for Each Slice
             'energy': HardwareCosts.ENERGY['bit_mul'] * activation_bits,  # Operates on Activation_Bits/2 Bits per Slice
-            'area': HardwareCosts.AREA['bit_mul'] * activation_bits
+            'area': HardwareCosts.AREA['bit_mul'] * activation_bits,
+            'latency': HardwareCosts.LATENCY['bit_mul'] * activation_bits / num_slices
         },
         'shifter': {
             'count': 1,
             'energy': HardwareCosts.ENERGY['shift_8bit'],
-            'area': HardwareCosts.AREA['shift_8bit']
+            'area': HardwareCosts.AREA['shift_8bit'],
+            'latency': HardwareCosts.LATENCY['shift_8bit']
         },
         'accumulator': {
             'count': 1,
             'energy': HardwareCosts.ENERGY['bit_acc'],
-            'area': HardwareCosts.AREA['bit_acc']
+            'area': HardwareCosts.AREA['bit_acc'],
+            'latency': HardwareCosts.LATENCY['bit_acc']
         }
     }
     
     # Account for the 2 Cycles of Operation (High/Low Slices)
-    # Energy Scales with Cycles, Area Remains the Same
+    # Energy and Latency Scale with Cycles, Area Remains the Same
     cycle_factor = num_slices
     
     total_area = sum(comp['area'] for comp in components.values())
     total_energy = sum(comp['energy'] for comp in components.values()) * cycle_factor
     
+    # Critical path per cycle: multiplier -> accumulator
+    cycle_latency = components['bit_multiplier']['latency'] + components['accumulator']['latency']
+    total_latency = cycle_latency * cycle_factor
+    
+    # For a whole tile computation we'd need tile_dim^2 of these operating in parallel
+    # The latency remains the same since they all operate in parallel
+    
     return {
-        'config': f"W{weight_bits}A{activation_bits}",
+        'config': f"W{weight_bits}A{activation_bits} SingleElement",
         'components': components,
         'total_energy': total_energy,
-        'total_area': total_area
+        'total_area': total_area,
+        'total_latency': total_latency,
+        'elements_needed': tile_dim * tile_dim  # Number of these needed for full tile
     }
 
-def calculate_bit_interleaved_mac_costs(weight_bits: int = 4, activation_bits: int = 8) -> Dict:
+def calculate_bit_interleaved_mac_costs(weight_bits: int = 4, activation_bits: int = 8, tile_dim: int = 4) -> Dict:
+    """Calculate costs for bit-interleaved MAC processing a full tile"""
     # - Multiple Bit-Multipliers with Shared Weights
     # - Adder Tree
     # - Multiplexer for Bit Selection
     
+    # For a full tile_dim x tile_dim processing, we need enough multipliers
+    elements_per_tile = tile_dim * tile_dim
+    
     components = {
         'bit_multipliers': {
-            'count': 8,  
-            'energy': 8 * HardwareCosts.ENERGY['bit_mul'],  # Bit-Level Multipliers
-            'area': 8 * HardwareCosts.AREA['bit_mul']
+            'count': 8 * elements_per_tile,  # 8 bit multipliers per element
+            'energy': 8 * elements_per_tile * HardwareCosts.ENERGY['bit_mul'],  # Bit-Level Multipliers
+            'area': 8 * elements_per_tile * HardwareCosts.AREA['bit_mul'],
+            'latency': HardwareCosts.LATENCY['bit_mul']  # Parallel operation
         },
         'adder_tree': {
-            'count': 1,
-            'energy': HardwareCosts.ENERGY['add_8bit'],  # Still Need a Decent Adder for All Results
-            'area': HardwareCosts.AREA['add_8bit']
+            'count': elements_per_tile,
+            'energy': elements_per_tile * HardwareCosts.ENERGY['add_8bit'],  # One adder tree per element
+            'area': elements_per_tile * HardwareCosts.AREA['add_8bit'],
+            'latency': HardwareCosts.LATENCY['add_8bit']
         },
         'mux': {
+            'count': elements_per_tile,
+            'energy': elements_per_tile * HardwareCosts.ENERGY['bit_mux'] * weight_bits * 2,  # MUX for Weight Bits and Activations
+            'area': elements_per_tile * HardwareCosts.AREA['bit_mux'] * weight_bits * 2,
+            'latency': HardwareCosts.LATENCY['bit_mux']
+        },
+        'final_adder_tree': {
             'count': 1,
-            'energy': HardwareCosts.ENERGY['bit_mux'] * weight_bits * 2,  # MUX for Weight Bits and Activations
-            'area': HardwareCosts.AREA['bit_mux'] * weight_bits * 2
+            'energy': HardwareCosts.ENERGY['add_8bit'] * (elements_per_tile - 1),  # Combine results from all elements
+            'area': HardwareCosts.AREA['add_8bit'] * (elements_per_tile - 1),
+            'latency': HardwareCosts.LATENCY['add_8bit'] * np.log2(elements_per_tile)  # Log depth tree
         }
     }
     
@@ -145,33 +205,53 @@ def calculate_bit_interleaved_mac_costs(weight_bits: int = 4, activation_bits: i
     total_energy = sum(comp['energy'] for comp in components.values())
     total_area = sum(comp['area'] for comp in components.values())
     
+    # Critical path: mux -> multipliers -> element adder tree -> final adder tree
+    total_latency = (components['mux']['latency'] + 
+                     components['bit_multipliers']['latency'] + 
+                     components['adder_tree']['latency'] +
+                     components['final_adder_tree']['latency'])
+    
     return {
-        'config': f"W{weight_bits}A{activation_bits}",
+        'config': f"W{weight_bits}A{activation_bits} Tile{tile_dim}x{tile_dim}",
         'components': components,
         'total_energy': total_energy,
-        'total_area': total_area
+        'total_area': total_area,
+        'total_latency': total_latency
     }
 
-def calculate_bit_column_mac_costs(weight_bits: int = 4, activation_bits: int = 8) -> Dict:
+def calculate_bit_column_mac_costs(weight_bits: int = 4, activation_bits: int = 8, tile_dim: int = 4) -> Dict:
+    """Calculate costs for bit-column MAC processing a full tile"""
     # - Parallel Bit Multipliers for Each Weight Bit
     # - Simple Adder Tree
     # - Shift for Accumulation
     
+    # For a full tile_dim x tile_dim processing, we need to scale components
+    elements_per_tile = tile_dim * tile_dim
+    
     components = {
         'bit_multipliers': {
-            'count': weight_bits,  # One per Weight Bit Column
-            'energy': weight_bits * HardwareCosts.ENERGY['bit_mul'],
-            'area': weight_bits * HardwareCosts.AREA['bit_mul']
+            'count': weight_bits * elements_per_tile,  # One per Weight Bit Column per element
+            'energy': weight_bits * elements_per_tile * HardwareCosts.ENERGY['bit_mul'],
+            'area': weight_bits * elements_per_tile * HardwareCosts.AREA['bit_mul'],
+            'latency': HardwareCosts.LATENCY['bit_mul']  # Parallel operation
         },
         'adders': {
-            'count': weight_bits - 1 + 1,  # Tree + Accumulator
-            'energy': weight_bits * HardwareCosts.ENERGY['bit_add'],
-            'area': weight_bits * HardwareCosts.AREA['bit_add']
+            'count': (weight_bits - 1 + 1) * elements_per_tile,  # Tree + Accumulator per element
+            'energy': weight_bits * elements_per_tile * HardwareCosts.ENERGY['bit_add'],
+            'area': weight_bits * elements_per_tile * HardwareCosts.AREA['bit_add'],
+            'latency': HardwareCosts.LATENCY['bit_add'] * np.log2(weight_bits)  # Logarithmic depth of adder tree
         },
         'shifter': {
+            'count': elements_per_tile,
+            'energy': elements_per_tile * HardwareCosts.ENERGY['shift_8bit'],
+            'area': elements_per_tile * HardwareCosts.AREA['shift_8bit'],
+            'latency': HardwareCosts.LATENCY['shift_8bit']
+        },
+        'final_adder_tree': {
             'count': 1,
-            'energy': HardwareCosts.ENERGY['shift_8bit'],
-            'area': HardwareCosts.AREA['shift_8bit']
+            'energy': HardwareCosts.ENERGY['add_8bit'] * (elements_per_tile - 1),  # Combine results from all elements
+            'area': HardwareCosts.AREA['add_8bit'] * (elements_per_tile - 1),
+            'latency': HardwareCosts.LATENCY['add_8bit'] * np.log2(elements_per_tile)  # Log depth tree
         }
     }
     
@@ -181,11 +261,18 @@ def calculate_bit_column_mac_costs(weight_bits: int = 4, activation_bits: int = 
     total_area = sum(comp['area'] for comp in components.values())
     total_energy = sum(comp['energy'] for comp in components.values()) * cycle_factor
     
+    # Critical path per cycle: multipliers -> element adders -> final adder tree
+    cycle_latency = (components['bit_multipliers']['latency'] + 
+                     components['adders']['latency'] +
+                     components['final_adder_tree']['latency'])
+    total_latency = cycle_latency * cycle_factor
+    
     return {
-        'config': f"W{weight_bits}A{activation_bits}",
+        'config': f"W{weight_bits}A{activation_bits} Tile{tile_dim}x{tile_dim}",
         'components': components,
         'total_energy': total_energy,
-        'total_area': total_area
+        'total_area': total_area,
+        'total_latency': total_latency
     }
 
 def calculate_pe_costs(tile_dim: int = 4, weight_bits: int = 4, activation_bits: int = 8) -> Dict:
@@ -201,12 +288,14 @@ def calculate_pe_costs(tile_dim: int = 4, weight_bits: int = 4, activation_bits:
         'transmission_gates': {
             'count': elements_per_tile * weight_bits,
             'energy': elements_per_tile * weight_bits * HardwareCosts.ENERGY['transmission_gate'] * active_ratio,
-            'area': elements_per_tile * weight_bits * HardwareCosts.AREA['transmission_gate']
+            'area': elements_per_tile * weight_bits * HardwareCosts.AREA['transmission_gate'],
+            'latency': HardwareCosts.LATENCY['transmission_gate']
         },
         'adder_tree': {
             'count': compressed_adders,
             'energy': compressed_adders * HardwareCosts.ENERGY['add_8bit'],
-            'area': compressed_adders * HardwareCosts.AREA['add_8bit']
+            'area': compressed_adders * HardwareCosts.AREA['add_8bit'],
+            'latency': HardwareCosts.LATENCY['add_8bit'] * np.log2(compressed_adders + 1)  # Log depth of tree
         }
     }
     
@@ -214,71 +303,90 @@ def calculate_pe_costs(tile_dim: int = 4, weight_bits: int = 4, activation_bits:
         'multipliers': {
             'count': elements_per_tile,
             'energy': elements_per_tile * HardwareCosts.ENERGY['mul_8bit'],
-            'area': elements_per_tile * HardwareCosts.AREA['mul_8bit']
+            'area': elements_per_tile * HardwareCosts.AREA['mul_8bit'],
+            'latency': HardwareCosts.LATENCY['mul_8bit']
         },
         'adder_tree': {
             'count': (elements_per_tile - 1),
             'energy': (elements_per_tile - 1) * HardwareCosts.ENERGY['add_8bit'],
-            'area': (elements_per_tile - 1) * HardwareCosts.AREA['add_8bit']
+            'area': (elements_per_tile - 1) * HardwareCosts.AREA['add_8bit'],
+            'latency': HardwareCosts.LATENCY['add_8bit'] * np.log2(elements_per_tile)  # Log depth of tree
         }
     }
     
-    bit_serial_costs = calculate_bit_serial_mac_costs(weight_bits, activation_bits)
-    bit_slice_costs = calculate_bit_slice_mac_costs(weight_bits, activation_bits)
-    bit_interleaved_costs = calculate_bit_interleaved_mac_costs(weight_bits, activation_bits)
-    bit_column_costs = calculate_bit_column_mac_costs(weight_bits, activation_bits)
+    bit_serial_costs = calculate_bit_serial_mac_costs(weight_bits, activation_bits, tile_dim)
+    bit_slice_costs = calculate_bit_slice_mac_costs(weight_bits, activation_bits, tile_dim)
+    bit_interleaved_costs = calculate_bit_interleaved_mac_costs(weight_bits, activation_bits, tile_dim)
+    bit_column_costs = calculate_bit_column_mac_costs(weight_bits, activation_bits, tile_dim)
     
     sq_tc_total_energy = sum(comp['energy'] for comp in sq_tc_components.values())
     sq_tc_total_area = sum(comp['area'] for comp in sq_tc_components.values())
+    sq_tc_total_latency = sq_tc_components['transmission_gates']['latency'] + sq_tc_components['adder_tree']['latency']
     
     mac_total_energy = sum(comp['energy'] for comp in mac_components.values())
     mac_total_area = sum(comp['area'] for comp in mac_components.values())
+    mac_total_latency = mac_components['multipliers']['latency'] + mac_components['adder_tree']['latency']
     
-    # For Bit-Serial Architectures, We Need One PE per Tile Element
-    # But Each PE is Much Simpler than a Full MAC
+    # For Bit-Serial and Bit-Slice, we need one PE per tile element
+    # But each PE is much simpler than a full MAC
+    # Latency is the same across elements as they operate in parallel
+    bit_serial_total_latency = bit_serial_costs['total_latency']
+    bit_slice_total_latency = bit_slice_costs['total_latency']
+    
     return {
         'tile_config': f"{tile_dim}x{tile_dim} W{weight_bits}A{activation_bits}",
         'sq_tc': {
             'components': sq_tc_components,
             'total_energy': sq_tc_total_energy,
-            'total_area': sq_tc_total_area
+            'total_area': sq_tc_total_area,
+            'total_latency': sq_tc_total_latency
         },
         'mac': {
             'components': mac_components,
             'total_energy': mac_total_energy,
-            'total_area': mac_total_area
+            'total_area': mac_total_area,
+            'total_latency': mac_total_latency
         },
         'bit_serial': {
             'components': bit_serial_costs['components'],
             'total_energy': bit_serial_costs['total_energy'] * elements_per_tile,
-            'total_area': bit_serial_costs['total_area'] * elements_per_tile
+            'total_area': bit_serial_costs['total_area'] * elements_per_tile,
+            'total_latency': bit_serial_total_latency  # Latency doesn't scale with elements as they operate in parallel
         },
         'bit_slice': {
             'components': bit_slice_costs['components'],
             'total_energy': bit_slice_costs['total_energy'] * elements_per_tile,
-            'total_area': bit_slice_costs['total_area'] * elements_per_tile
+            'total_area': bit_slice_costs['total_area'] * elements_per_tile,
+            'total_latency': bit_slice_total_latency  # Latency doesn't scale with elements as they operate in parallel
         },
         'bit_interleaved': {
             'components': bit_interleaved_costs['components'],
-            'total_energy': bit_interleaved_costs['total_energy'],  # Don't Scale by Elements_Per_Tile as It's More Shared
-            'total_area': bit_interleaved_costs['total_area']  # More Shared Hardware, Don't Scale by Full Tile Elements
+            'total_energy': bit_interleaved_costs['total_energy'],  # Already accounts for full tile
+            'total_area': bit_interleaved_costs['total_area'],  # Already accounts for full tile
+            'total_latency': bit_interleaved_costs['total_latency']
         },
         'bit_column': {
             'components': bit_column_costs['components'],
-            'total_energy': bit_column_costs['total_energy'],  # Already Accounts for Column-Parallel Operation
-            'total_area': bit_column_costs['total_area']  # Already Sized for the Bit-Level Parallelism
+            'total_energy': bit_column_costs['total_energy'],  # Already accounts for full tile
+            'total_area': bit_column_costs['total_area'],  # Already accounts for full tile
+            'total_latency': bit_column_costs['total_latency']
         },
         'comparison': {
             'sq_tc_mac_energy_ratio': sq_tc_total_energy / mac_total_energy,
             'sq_tc_mac_area_ratio': sq_tc_total_area / mac_total_area,
+            'sq_tc_mac_latency_ratio': sq_tc_total_latency / mac_total_latency,
             'bit_serial_mac_energy_ratio': (bit_serial_costs['total_energy'] * elements_per_tile) / mac_total_energy,
             'bit_serial_mac_area_ratio': (bit_serial_costs['total_area'] * elements_per_tile) / mac_total_area,
+            'bit_serial_mac_latency_ratio': bit_serial_total_latency / mac_total_latency,
             'bit_slice_mac_energy_ratio': (bit_slice_costs['total_energy'] * elements_per_tile) / mac_total_energy,
             'bit_slice_mac_area_ratio': (bit_slice_costs['total_area'] * elements_per_tile) / mac_total_area,
+            'bit_slice_mac_latency_ratio': bit_slice_total_latency / mac_total_latency,
             'bit_interleaved_mac_energy_ratio': bit_interleaved_costs['total_energy'] / mac_total_energy,
             'bit_interleaved_mac_area_ratio': bit_interleaved_costs['total_area'] / mac_total_area,
+            'bit_interleaved_mac_latency_ratio': bit_interleaved_costs['total_latency'] / mac_total_latency,
             'bit_column_mac_energy_ratio': bit_column_costs['total_energy'] / mac_total_energy,
-            'bit_column_mac_area_ratio': bit_column_costs['total_area'] / mac_total_area
+            'bit_column_mac_area_ratio': bit_column_costs['total_area'] / mac_total_area,
+            'bit_column_mac_latency_ratio': bit_column_costs['total_latency'] / mac_total_latency
         }
     }
 
@@ -409,7 +517,7 @@ def plot_scaling_analysis(matrix_sizes: list, results: list):
         plt.tight_layout(rect=[0, 0.05, 1, 0.95])
         
         # Save the Figure with High Quality
-        plt.savefig(f'{fig_name}.png', format='png', dpi=300, bbox_inches='tight')
+        plt.savefig(os.path.join(results_dir, f'{fig_name}.png'), format='png', dpi=300, bbox_inches='tight')
     
     # Create and save Logarithmic Scale Plot
     create_plot('mac_architecture_comparison_log', use_log_scale=True)
@@ -430,8 +538,10 @@ def analyse_tile_scaling(tile_sizes: list, weight_bits: int = 4, activation_bits
             'tile_dim': tile_dim,
             'sq_tc_energy': pe_costs['sq_tc']['total_energy'],
             'sq_tc_area': pe_costs['sq_tc']['total_area'],
+            'sq_tc_latency': pe_costs['sq_tc']['total_latency'],
             'mac_energy': pe_costs['mac']['total_energy'],
-            'mac_area': pe_costs['mac']['total_area']
+            'mac_area': pe_costs['mac']['total_area'],
+            'mac_latency': pe_costs['mac']['total_latency']
         })
     
     return results
@@ -446,8 +556,10 @@ def analyse_weight_bits_scaling(weight_bits_list: list, tile_dim: int = 4, activ
             'weight_bits': w_bits,
             'sq_tc_energy': pe_costs['sq_tc']['total_energy'],
             'sq_tc_area': pe_costs['sq_tc']['total_area'],
+            'sq_tc_latency': pe_costs['sq_tc']['total_latency'],
             'mac_energy': pe_costs['mac']['total_energy'],
-            'mac_area': pe_costs['mac']['total_area']
+            'mac_area': pe_costs['mac']['total_area'],
+            'mac_latency': pe_costs['mac']['total_latency']
         })
     
     return results
@@ -463,8 +575,10 @@ def analyse_combined_scaling(tile_sizes: list, weight_bits_list: list, activatio
             combined_results[tile_dim][w_bits] = {
                 'sq_tc_energy': pe_costs['sq_tc']['total_energy'],
                 'sq_tc_area': pe_costs['sq_tc']['total_area'],
+                'sq_tc_latency': pe_costs['sq_tc']['total_latency'],
                 'mac_energy': pe_costs['mac']['total_energy'],
-                'mac_area': pe_costs['mac']['total_area']
+                'mac_area': pe_costs['mac']['total_area'],
+                'mac_latency': pe_costs['mac']['total_latency']
             }
     
     return combined_results
@@ -501,7 +615,7 @@ def plot_tile_size_scaling(tile_sizes: list, results: list):
     plt.tight_layout()
     
     # Save the Figure with High Quality
-    plt.savefig('sq_tc_vs_tile_size.png', format='png', dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, 'sq_tc_vs_tile_size.png'), format='png', dpi=300, bbox_inches='tight')
     plt.show()
 
 def plot_weight_bits_scaling(weight_bits_list: list, results: list):
@@ -536,7 +650,7 @@ def plot_weight_bits_scaling(weight_bits_list: list, results: list):
     plt.tight_layout()
     
     # Save the Figure with High Quality
-    plt.savefig('sq_tc_vs_weight_bits.png', format='png', dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, 'sq_tc_vs_weight_bits.png'), format='png', dpi=300, bbox_inches='tight')
     plt.show()
 
 def plot_combined_heatmap(tile_sizes: list, weight_bits_list: list, combined_results: dict):
@@ -592,7 +706,47 @@ def plot_combined_heatmap(tile_sizes: list, weight_bits_list: list, combined_res
     
     # Adjust layout
     plt.tight_layout()
-    plt.savefig('sq_tc_combined_heatmap.png', format='png', dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, 'sq_tc_combined_heatmap.png'), format='png', dpi=300, bbox_inches='tight')
+    plt.show()
+
+def plot_latency_heatmap(tile_sizes: list, weight_bits_list: list, combined_results: dict):
+    """Plot heatmap of SQ-TC latency for combinations of tile size and weight bits"""
+    plt.style.use('seaborn-v0_8-paper')
+    
+    # Create latency matrix for the heatmap
+    latency_matrix = np.zeros((len(tile_sizes), len(weight_bits_list)))
+    
+    # Fill the matrix
+    for i, tile_dim in enumerate(tile_sizes):
+        for j, w_bits in enumerate(weight_bits_list):
+            latency_matrix[i, j] = combined_results[tile_dim][w_bits]['sq_tc_latency']
+    
+    # Create a figure for the latency heatmap
+    fig, ax = plt.subplots(figsize=(10, 8), dpi=300)
+    
+    # Plot latency heatmap
+    im = ax.imshow(latency_matrix, cmap='Blues', aspect='auto')
+    ax.set_title('SQ-TC Latency (ns)', fontsize=14, fontweight='bold')
+    ax.set_xlabel('Weight Bit Width', fontsize=12)
+    ax.set_ylabel('Tile Dimension (NxN)', fontsize=12)
+    ax.set_xticks(range(len(weight_bits_list)))
+    ax.set_yticks(range(len(tile_sizes)))
+    ax.set_xticklabels(weight_bits_list)
+    ax.set_yticklabels(tile_sizes)
+    
+    # Add colorbar
+    cbar = fig.colorbar(im, ax=ax)
+    cbar.set_label('Latency (ns)', rotation=270, labelpad=15)
+    
+    # Add value annotations
+    for i in range(len(tile_sizes)):
+        for j in range(len(weight_bits_list)):
+            ax.text(j, i, f"{latency_matrix[i, j]:.2f}", ha="center", va="center", 
+                   color="black" if latency_matrix[i, j] < np.max(latency_matrix) / 1.5 else "white")
+    
+    # Adjust layout
+    plt.tight_layout()
+    plt.savefig(os.path.join(results_dir, 'sq_tc_latency_heatmap.png'), format='png', dpi=300, bbox_inches='tight')
     plt.show()
 
 def plot_component_breakdown(tile_dim: int = 4, weight_bits: int = 4, activation_bits: int = 8):
@@ -640,7 +794,7 @@ def plot_component_breakdown(tile_dim: int = 4, weight_bits: int = 4, activation
     
     # Adjust layout
     plt.tight_layout(rect=[0, 0.05, 1, 0.95])
-    plt.savefig('sq_tc_component_breakdown.png', format='png', dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, 'sq_tc_component_breakdown.png'), format='png', dpi=300, bbox_inches='tight')
     plt.show()
 
 def plot_sparsity_impact(tile_dim: int = 4, weight_bits: int = 4, activation_bits: int = 8):
@@ -744,7 +898,7 @@ def plot_sparsity_impact(tile_dim: int = 4, weight_bits: int = 4, activation_bit
     
     # Adjust layout
     plt.tight_layout(rect=[0, 0.05, 1, 0.95])
-    plt.savefig('sq_tc_sparsity_impact.png', format='png', dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, 'sq_tc_sparsity_impact.png'), format='png', dpi=300, bbox_inches='tight')
     plt.show()
 
 def plot_perf_comparison_radar(tile_dim: int = 4, weight_bits: int = 4, activation_bits: int = 8):
@@ -841,7 +995,157 @@ def plot_perf_comparison_radar(tile_dim: int = 4, weight_bits: int = 4, activati
     
     # Adjust layout
     plt.tight_layout(rect=[0, 0.05, 1, 0.95])
-    plt.savefig('architecture_radar_comparison.png', format='png', dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(results_dir, 'architecture_radar_comparison.png'), format='png', dpi=300, bbox_inches='tight')
+    plt.show()
+
+def plot_latency_comparison(tile_dim: int = 4, weight_bits: int = 4, activation_bits: int = 8):
+    """Plot latency comparison across different MAC architectures"""
+    plt.style.use('seaborn-v0_8-paper')
+    
+    # Calculate costs
+    pe_costs = calculate_pe_costs(tile_dim=tile_dim, weight_bits=weight_bits, activation_bits=activation_bits)
+    
+    # Extract architectures and latencies
+    architectures = ['SQ-TC', 'MAC', 'Bit-Serial', 'Bit-Slice', 'Bit-Interleaved', 'Bit-Column']
+    latencies = [
+        pe_costs['sq_tc']['total_latency'],
+        pe_costs['mac']['total_latency'],
+        pe_costs['bit_serial']['total_latency'],
+        pe_costs['bit_slice']['total_latency'],
+        pe_costs['bit_interleaved']['total_latency'],
+        pe_costs['bit_column']['total_latency']
+    ]
+    
+    # Colors for consistency with other plots
+    colors = ['#808080', '#8B7CC8', '#6F9EE3', '#B784D9', '#E091C8', '#4B6BCC']
+    
+    # Create horizontal bar chart with wider figure
+    fig, ax = plt.subplots(figsize=(12, 6), dpi=300)
+    bars = ax.barh(architectures, latencies, color=colors)
+    
+    # Calculate maximum latency to set proper x-axis limit
+    max_latency = max(latencies)
+    x_limit = max_latency * 1.3  # Add 30% extra space for labels
+    ax.set_xlim(0, x_limit)
+    
+    # Add values as text labels
+    for i, bar in enumerate(bars):
+        ax.text(bar.get_width() + (max_latency * 0.02), bar.get_y() + bar.get_height()/2, 
+                f"{latencies[i]:.2f} ns", va='center')
+    
+    # Format the plot
+    ax.set_title('Latency Comparison Across MAC Architectures', fontsize=14, fontweight='bold')
+    ax.set_xlabel('Latency (ns)', fontsize=12)
+    ax.set_ylabel('Architecture', fontsize=12)
+    ax.grid(True, alpha=0.3, linestyle='--', axis='x')
+    
+    # Add subtitle with configuration
+    plt.figtext(0.5, 0.01, f"Tile Dim: {tile_dim}×{tile_dim}, Weight Bits: {weight_bits}, Activation Bits: {activation_bits}, Sparsity: 80%",
+               ha="center", fontsize=10)
+    
+    # Adjust layout
+    plt.tight_layout(rect=[0, 0.05, 1, 0.95])
+    plt.savefig(os.path.join(results_dir, 'mac_latency_comparison.png'), format='png', dpi=300, bbox_inches='tight')
+    plt.show()
+
+def plot_latency_vs_tile_size(tile_sizes: list):
+    """Plot how SQ-TC latency scales with tile size"""
+    plt.style.use('seaborn-v0_8-paper')
+    
+    results = []
+    for tile_dim in tile_sizes:
+        pe_costs = calculate_pe_costs(tile_dim=tile_dim)
+        results.append({
+            'tile_dim': tile_dim,
+            'sq_tc': pe_costs['sq_tc']['total_latency'],
+        })
+    
+    # Create a figure
+    fig, ax = plt.subplots(figsize=(10, 6), dpi=300)
+    
+    # Plot SQ-TC latency
+    ax.plot(
+        [r['tile_dim'] for r in results],
+        [r['sq_tc'] for r in results],
+        color='#808080',
+        marker='o',
+        markersize=6,
+        linewidth=2
+    )
+    
+    # Format the plot
+    ax.set_title('SQ-TC Latency vs Tile Size', fontsize=14, fontweight='bold')
+    ax.set_xlabel('Tile Dimension (NxN)', fontsize=12)
+    ax.set_ylabel('Latency (ns)', fontsize=12)
+    ax.grid(True, alpha=0.3, linestyle='--')
+    
+    # Add data labels
+    for i, r in enumerate(results):
+        ax.annotate(
+            f"{r['sq_tc']:.2f} ns",
+            (r['tile_dim'], r['sq_tc']),
+            textcoords="offset points",
+            xytext=(0,10),
+            ha='center'
+        )
+    
+    # Add subtitle
+    plt.figtext(0.5, 0.01, f"Weight Bits: 4, Activation Bits: 8, Sparsity: 80%",
+                ha="center", fontsize=10)
+    
+    # Adjust layout
+    plt.tight_layout(rect=[0, 0.05, 1, 0.95])
+    plt.savefig(os.path.join(results_dir, 'sq_tc_latency_vs_tile_size.png'), format='png', dpi=300, bbox_inches='tight')
+    plt.show()
+
+def plot_latency_vs_weight_bits(weight_bits_list: list):
+    """Plot how SQ-TC latency scales with weight bits"""
+    plt.style.use('seaborn-v0_8-paper')
+    
+    results = []
+    for w_bits in weight_bits_list:
+        pe_costs = calculate_pe_costs(weight_bits=w_bits)
+        results.append({
+            'weight_bits': w_bits,
+            'sq_tc': pe_costs['sq_tc']['total_latency'],
+        })
+    
+    # Create a figure
+    fig, ax = plt.subplots(figsize=(10, 6), dpi=300)
+    
+    # Plot SQ-TC latency
+    ax.plot(
+        [r['weight_bits'] for r in results],
+        [r['sq_tc'] for r in results],
+        color='#808080',
+        marker='o',
+        markersize=6,
+        linewidth=2
+    )
+    
+    # Format the plot
+    ax.set_title('SQ-TC Latency vs Weight Bit Width', fontsize=14, fontweight='bold')
+    ax.set_xlabel('Weight Bit Width', fontsize=12)
+    ax.set_ylabel('Latency (ns)', fontsize=12)
+    ax.grid(True, alpha=0.3, linestyle='--')
+    
+    # Add data labels
+    for i, r in enumerate(results):
+        ax.annotate(
+            f"{r['sq_tc']:.2f} ns",
+            (r['weight_bits'], r['sq_tc']),
+            textcoords="offset points",
+            xytext=(0,10),
+            ha='center'
+        )
+    
+    # Add subtitle
+    plt.figtext(0.5, 0.01, f"Tile Dim: 4x4, Activation Bits: 8, Sparsity: 80%",
+                ha="center", fontsize=10)
+    
+    # Adjust layout
+    plt.tight_layout(rect=[0, 0.05, 1, 0.95])
+    plt.savefig(os.path.join(results_dir, 'sq_tc_latency_vs_weight_bits.png'), format='png', dpi=300, bbox_inches='tight')
     plt.show()
 
 if __name__ == "__main__":
@@ -867,6 +1171,7 @@ if __name__ == "__main__":
     print("\nAnalysing Combined Scaling (Tile Size vs Weight Bits)...")
     combined_results = analyse_combined_scaling(tile_sizes, weight_bits_list)
     plot_combined_heatmap(tile_sizes, weight_bits_list, combined_results)
+    plot_latency_heatmap(tile_sizes, weight_bits_list, combined_results)
     
     print("\nAnalysing Component Breakdown for SQ-TC...")
     plot_component_breakdown()
@@ -876,3 +1181,12 @@ if __name__ == "__main__":
     
     print("\nComparing Architectures with Radar Chart...")
     plot_perf_comparison_radar()
+    
+    print("\nLatency Comparison Across MAC Architectures...")
+    plot_latency_comparison()
+    
+    print("\nLatency Scaling with Tile Size...")
+    plot_latency_vs_tile_size(tile_sizes)
+    
+    print("\nLatency Scaling with Weight Bits...")
+    plot_latency_vs_weight_bits(weight_bits_list)

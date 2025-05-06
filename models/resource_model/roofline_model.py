@@ -13,7 +13,7 @@ if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
 from panda import SIMDEngine
-from preprocessing.preprocess_weights import preprocess_weights
+from panda.preprocessing.preprocess_weights import preprocess_weights
 
 class SuppressOutput:
     def __init__(self):
