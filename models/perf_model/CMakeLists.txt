@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(PANDA CXX)
+project(PERF_MODEL CXX)
 
 # C++
 set(CMAKE_CXX_STANDARD 17)
@@ -57,18 +57,18 @@ set(CORE_SOURCES
 )
 
 # Create Python Module
-pybind11_add_module(panda 
+pybind11_add_module(perf_model 
     src/python/bindings.cpp
     ${CORE_SOURCES}
 )
-target_include_directories(panda PRIVATE 
+target_include_directories(perf_model PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
-target_link_libraries(panda PRIVATE nlohmann_json::nlohmann_json)
+target_link_libraries(perf_model PRIVATE nlohmann_json::nlohmann_json)
 
 # Create Executable Target (optional)
-add_executable(PANDA ${CORE_SOURCES} src/main.cpp)
-target_include_directories(PANDA PRIVATE 
+add_executable(PERF_MODEL ${CORE_SOURCES} src/main.cpp)
+target_include_directories(PERF_MODEL PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
-target_link_libraries(PANDA PRIVATE nlohmann_json::nlohmann_json)
+target_link_libraries(PERF_MODEL PRIVATE nlohmann_json::nlohmann_json)

@@ -1,12 +1,14 @@
 #pragma once
 
-namespace panda {
+namespace perf_model {
 
 struct PerformanceMetrics {
     // Overall Latency in ns
     double system_latency_ns;
     // Throughput defined as Total Operations (FLOPs) per Second
     double throughput_ops;
+    // Operations per Clock Cycle
+    double ops_per_cycle;
     // Memory Bandwidth in bytes per second
     double memory_bandwidth_bytes_per_sec;
     // Arithmetic Intensity in FLOPs per Byte
@@ -23,4 +25,4 @@ struct PerformanceMetrics {
     double mask_area_um2;        
 };
 
-} // namespace panda 
+} // namespace perf_model 

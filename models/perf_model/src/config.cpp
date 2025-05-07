@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <nlohmann/json.hpp>  
 
-namespace panda {
+namespace perf_model {
 namespace config {
 
 using json = nlohmann::json;
@@ -46,4 +46,4 @@ void saveConfig(const std::string &filename) {
 }
 
 } // namespace config
-} // namespace panda 
+} // namespace perf_model 

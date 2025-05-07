@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <cmath> 
 
-namespace panda {
+namespace perf_model {   
 
 class PEArray {
 private:
@@ -90,4 +90,4 @@ public:
     }
 };
 
-} // namespace panda 
+} // namespace perf_model 

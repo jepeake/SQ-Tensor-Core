@@ -1,4 +1,4 @@
-from setuptools import setup, Extension
+from setuptools import setup, Extension, find_packages
 from setuptools.command.build_ext import build_ext
 import sys
 import os
@@ -36,18 +36,18 @@ class CMakeBuild(build_ext):
         subprocess.check_call(['ninja'], cwd=self.build_temp)
 
 setup(
-    name='panda',
+    name='perf_model',
     version='0.1',
     author='Jacob Peake',
-    description='Panda Python Bindings',
-    ext_modules=[CMakeExtension('panda._panda')],
+    description='SQ-TC Python Bindings',
+    ext_modules=[CMakeExtension('perf_model._perf_model')],
     cmdclass=dict(build_ext=CMakeBuild),
-    packages=['panda'],
-    package_dir={'panda': '.'},
+    packages=['perf_model', 'perf_model.preprocessing'],
+    package_dir={'perf_model': '.'},
     py_modules=['interface'],
     entry_points={
         'console_scripts': [
-            'panda = interface:main'
+            'perf_model = interface:main'
         ]
     },
     zip_safe=False,

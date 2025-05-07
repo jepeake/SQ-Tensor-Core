@@ -12,8 +12,8 @@ parent_dir = os.path.dirname(script_dir)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
-from panda import SIMDEngine
-from panda.preprocessing.preprocess_weights import preprocess_weights
+from perf_model import SIMDEngine
+from perf_model.preprocessing.preprocess_weights import preprocess_weights
 
 class SuppressOutput:
     def __init__(self):
@@ -54,8 +54,8 @@ def update_config(num_pes: int, matrix_size: int, tile_size: int) -> bool:
     parent_dir = os.path.dirname(script_dir)
     
     config_file_locations = [
-        os.path.join(parent_dir, "src", "core", "panda_config.json"),
-        os.path.join(parent_dir, "models", "panda", "src", "core", "panda_config.json")
+        os.path.join(parent_dir, "src", "core", "perf_model_config.json"),
+        os.path.join(parent_dir, "models", "perf_model", "src", "core", "perf_model_config.json")
     ]
     
     for path in config_file_locations:
@@ -153,7 +153,7 @@ def plot_roofline(results: List[Dict], use_empirical_peaks: bool = True):
     plt.yscale('log')
     plt.xlabel('Arithmetic Intensity (FLOPS/Byte)')
     plt.ylabel('Performance (FLOPS)')
-    plt.title('Roofline Model for PANDA Hardware Architecture')
+    plt.title('Roofline Model for SQ-TC Hardware Architecture')
     plt.grid(True, which="both", ls="-", alpha=0.2)
     plt.legend()
     
@@ -180,10 +180,10 @@ def plot_roofline(results: List[Dict], use_empirical_peaks: bool = True):
         plt.text(i, eff + max(energy_efficiency)*0.02, f"{eff/1e9:.1f}", ha='center')
     
     plt.tight_layout()
-    plt.savefig('panda_energy_efficiency.png', dpi=300)
+    plt.savefig('sqtc_energy_efficiency.png', dpi=300)
     
     plt.tight_layout()
-    plt.savefig('panda_roofline.png', dpi=300)
+    plt.savefig('sqtc_roofline.png', dpi=300)
     plt.show()
 
 def main():
@@ -193,7 +193,7 @@ def main():
     num_bits = 4    
     tile_size = 4   
     
-    parser = argparse.ArgumentParser(description='Generate a Roofline Model for PANDA.')
+    parser = argparse.ArgumentParser(description='Generate a Roofline Model for SQ-TC.')
     parser.add_argument('--pes', type=int, default=num_pes, help='Number of Processing Elements')
     parser.add_argument('--bits', type=int, default=num_bits, help='Number of Bits for Weights')
     parser.add_argument('--tile', type=int, default=tile_size, help='Tile Size')
@@ -210,7 +210,7 @@ def main():
     matrix_sizes = [int(s) for s in args.sizes.split(',')]
     verbose = args.verbose
     
-    print("\nPANDA Hardware Roofline Analysis")
+    print("\nSQ-TC Hardware Roofline Analysis")
     print("=" * 50)
     print(f"Hardware Configuration: {num_pes} PEs, {tile_size}×{tile_size} tiles, {num_bits}-bit weights, {clock_frequency_hz/1e9:.2f} GHz")
     
@@ -256,7 +256,7 @@ def main():
     
     print("\nGenerating Roofline Plot...")
     plot_roofline(results)
-    print("Roofline Analysis Complete. Plot Saved to 'panda_roofline.png'")
+    print("Roofline Analysis Complete. Plot Saved to 'sqtc_roofline.png'")
 
 if __name__ == "__main__":
     main()

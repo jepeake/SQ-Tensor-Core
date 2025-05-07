@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-namespace panda {
+namespace perf_model {
 
 class WeightMemory {
 private:
@@ -24,4 +24,4 @@ public:
     size_t getNumCols() const;
 };
 
-} // namespace panda
+} // namespace perf_model

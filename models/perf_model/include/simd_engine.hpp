@@ -4,7 +4,7 @@
 #include "performance_metrics.hpp"
 #include <memory>
 
-namespace panda {
+namespace perf_model {
 
 class SIMDEngine {
 private:
@@ -34,4 +34,4 @@ public:
     PerformanceMetrics getPerformanceMetrics(double clock_frequency_hz) const;
 };
 
-} // namespace panda
+} // namespace perf_model

@@ -3,7 +3,7 @@
 #include <stdexcept>
 #include <iostream>
 
-namespace panda {
+namespace perf_model {
 
 WeightMemory::WeightMemory(const std::string& weight_file) {
     loadWeights(weight_file);
@@ -87,4 +87,4 @@ void WeightMemory::loadWeights(const std::string& filename) {
     }
 }
 
-} // namespace panda
+} // namespace perf_model

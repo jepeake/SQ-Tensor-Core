@@ -5,12 +5,12 @@
 #include <cmath>
 #include <filesystem>
 
-namespace panda {
+namespace perf_model {
 
 SIMDEngine::SIMDEngine(const std::string& weight_file) {
-    std::filesystem::path config_path = std::filesystem::current_path() / "panda_config.json";
+    std::filesystem::path config_path = std::filesystem::current_path() / "perf_model_config.json";
     if (!std::filesystem::exists(config_path)) {
-        config_path = std::filesystem::current_path() / "src/core/panda_config.json";
+        config_path = std::filesystem::current_path() / "src/core/perf_model_config.json";
     }
     config::loadConfig(config_path.string());
 
@@ -268,4 +268,4 @@ PerformanceMetrics SIMDEngine::getPerformanceMetrics(double clock_frequency_hz) 
     return metrics;
 }
 
-} // namespace panda
+} // namespace perf_model

@@ -2,7 +2,7 @@
 #include <cstddef>
 #include <vector>
 
-namespace panda {
+namespace perf_model {
 
 struct PEStats {
     size_t total_cycles;
@@ -63,4 +63,4 @@ struct SystemStats {
     }
 };
 
-} // namespace panda
+} // namespace perf_model

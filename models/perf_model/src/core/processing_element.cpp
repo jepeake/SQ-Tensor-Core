@@ -2,7 +2,7 @@
 #include <iostream>
 #include <iomanip>
 
-namespace panda {
+namespace perf_model {
 
 ProcessingElement::ProcessingElement(size_t ts) : tile_size(ts) {
     stats.clear();
@@ -69,4 +69,4 @@ Tile<int32_t> ProcessingElement::mpGEMM(
     return result;
 }
 
-} // namespace panda
+} // namespace perf_model

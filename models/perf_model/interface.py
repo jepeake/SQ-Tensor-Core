@@ -17,7 +17,7 @@ def getch():
 
 def main():
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    config_file = os.path.join(current_dir, "src", "core", "panda_config.json")
+    config_file = os.path.join(current_dir, "src", "core", "perf_model_config.json")
     
     print("""
 ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠿⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
@@ -32,7 +32,7 @@ def main():
 ⣿⣿⣿⣿⣧⣀⡀⠀⠀⠀⠀⠀⣀⣰⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
 ⣿⣿⣿⣿⣿⣿⣿⣷⣶⣶⣶⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
     """)
-    print("Welcome to the Panda Hardware Model 🐼\n")
+    print("Welcome to the SQ-TC Hardware Model.\n")
     print("Type 'help' to see available commands.\n")
     
     while True:

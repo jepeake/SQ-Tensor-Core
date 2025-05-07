@@ -4,7 +4,7 @@
 #include "stats.hpp"
 #include <vector>
 
-namespace panda {
+namespace perf_model {
 
 class ProcessingElement {
 private:
@@ -24,4 +24,4 @@ public:
     void set_simulated_total_cycles(size_t cycles) { stats.total_cycles = cycles; }
 };
 
-} // namespace panda
+} // namespace perf_model

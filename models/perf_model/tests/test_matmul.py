@@ -1,5 +1,5 @@
 import numpy as np
-from panda import SIMDEngine
+from perf_model import SIMDEngine
 from preprocessing.preprocess_weights import preprocess_weights
 from typing import List, Dict
 import textwrap
@@ -455,7 +455,7 @@ def run_matmul_test(matrix_size, tile_size, num_bits, activation_threshold=0, we
 if __name__ == "__main__":
     import sys
     this_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(this_dir, "..", "src", "core", "panda_config.json")
+    config_path = os.path.join(this_dir, "..", "src", "core", "perf_model_config.json")
     
     try:
         with open(config_path, "r") as f:

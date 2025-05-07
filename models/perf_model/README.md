@@ -1,6 +1,6 @@
-# _Panda (Model)_
+# _Performance Model_
 
-_This is the hardware functional model for the Panda Hardware Architecture_.
+_This is the hardware functional and performance model for the SQ-TC Hardware Architecture_.
 
 ## _Build_
 
@@ -18,7 +18,7 @@ sudo apt-get install cmake ninja-build llvm clang
 _Install Packages & Build_
 
 ```
-cd models/panda
+cd models/perf_model
 pip install -r requirements.txt
 pip install -e .
 ```
@@ -26,5 +26,5 @@ pip install -e .
 ## _Running_
 
 ```
-panda
+perf_model
 ```

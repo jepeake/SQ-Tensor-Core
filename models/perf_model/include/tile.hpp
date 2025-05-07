@@ -2,7 +2,7 @@
 #include <vector>
 #include <cstdint>
 
-namespace panda {
+namespace perf_model {
 
 template<typename T>
 struct Tile {
@@ -22,4 +22,4 @@ struct Tile {
     }
 };
 
-} // namespace panda
+} // namespace perf_model
