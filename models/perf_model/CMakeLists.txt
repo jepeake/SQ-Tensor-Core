@@ -53,6 +53,7 @@ set(CORE_SOURCES
     src/core/weight_memory.cpp
     src/core/processing_element.cpp
     src/core/simd_engine.cpp
+    src/pe_array.cpp
     src/config.cpp
 )
 
