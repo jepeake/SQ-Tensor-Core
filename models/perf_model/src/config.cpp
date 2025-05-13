@@ -32,7 +32,7 @@ double expected_weight_sparsity = 0.0;      // Default to no Sparsity
 double expected_activation_sparsity = 0.0;  // Default to no Sparsity
 int adder_tree_width = 4;
 int accumulation_mode = 0;                  // Default to Row-Wise (0)
-int synchronization_mode = 0;               // Default to Global Stalling (0)
+int synchronisation_mode = 0;               // Default to Global Stalling (0)
 int batch_size = 8;                         // Default Batch Size for Synchronisation Mode 2
 
 
@@ -81,8 +81,8 @@ void loadConfig(const std::string &filename) {
         }
     }
     
-    if (config.contains("synchronization_mode")) {
-        synchronization_mode = config["synchronization_mode"];
+    if (config.contains("synchronisation_mode")) {
+        synchronisation_mode = config["synchronisation_mode"];
     }
     
     if (config.contains("batch_size")) {
@@ -99,7 +99,7 @@ void saveConfig(const std::string &filename) {
     config["expected_activation_sparsity"] = expected_activation_sparsity;
     config["adder_tree_width"] = adder_tree_width;
     config["accumulation_mode"] = accumulation_mode;
-    config["synchronization_mode"] = synchronization_mode;
+    config["synchronisation_mode"] = synchronisation_mode;
     config["batch_size"] = batch_size;
 
     std::ofstream f(filename);

@@ -39,7 +39,7 @@ SIMDEngine::SIMDEngine(const std::string& weight_file) {
     pe_array = std::make_unique<PEArray>(num_pes, tile_size);
     
     // Set Synchronisation Mode
-    system_stats.sync_mode = static_cast<SynchronisationMode>(config::synchronization_mode);
+    system_stats.sync_mode = static_cast<SynchronisationMode>(config::synchronisation_mode);
     system_stats.fifo_depth = pe_array->getFIFODepth();
     system_stats.output_buffer_size = pe_array->getOutputBufferSize();
 }

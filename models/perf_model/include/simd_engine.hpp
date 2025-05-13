@@ -4,7 +4,22 @@
 #include "performance_metrics.hpp"
 #include <memory>
 
+
+//   █████████  █████ ██████   ██████ ██████████      ██████████                      ███                     
+//  ███░░░░░███░░███ ░░██████ ██████ ░░███░░░░███    ░░███░░░░░█                     ░░░                      
+// ░███    ░░░  ░███  ░███░█████░███  ░███   ░░███    ░███  █ ░  ████████    ███████ ████  ████████    ██████ 
+// ░░█████████  ░███  ░███░░███ ░███  ░███    ░███    ░██████   ░░███░░███  ███░░███░░███ ░░███░░███  ███░░███
+//  ░░░░░░░░███ ░███  ░███ ░░░  ░███  ░███    ░███    ░███░░█    ░███ ░███ ░███ ░███ ░███  ░███ ░███ ░███████ 
+//  ███    ░███ ░███  ░███      ░███  ░███    ███     ░███ ░   █ ░███ ░███ ░███ ░███ ░███  ░███ ░███ ░███░░░  
+// ░░█████████  █████ █████     █████ ██████████      ██████████ ████ █████░░███████ █████ ████ █████░░██████ 
+//  ░░░░░░░░░  ░░░░░ ░░░░░     ░░░░░ ░░░░░░░░░░      ░░░░░░░░░░ ░░░░ ░░░░░  ░░░░░███░░░░░ ░░░░ ░░░░░  ░░░░░░  
+//                                                                          ███ ░███                          
+//                                                                         ░░██████                           
+//                                                                          ░░░░░░                            
+
+
 namespace perf_model {
+
 
 class SIMDEngine {
 private:
@@ -17,8 +32,21 @@ private:
     size_t num_matmuls;
     SystemStats system_stats;
     
-    // Helper method to perform a single matrix multiplication
+    // Helper Method to Perform a Single Matrix Multiplication
     Tile<int32_t> performSingleMatrixMultiply(const std::vector<int16_t>& activations, int16_t activation_threshold);
+    
+    // Different Accumulation Mode Implementations
+    Tile<int32_t> performRowWiseAccumulation(
+        const std::vector<std::vector<Tile<int16_t>>>& activation_tiles,
+        size_t num_row_tiles,
+        size_t num_col_tiles,
+        int16_t activation_threshold);
+        
+    Tile<int32_t> performLocalPEAccumulation(
+        const std::vector<std::vector<Tile<int16_t>>>& activation_tiles,
+        size_t num_row_tiles,
+        size_t num_col_tiles,
+        int16_t activation_threshold);
     
 public:
     explicit SIMDEngine(const std::string& weight_file);
@@ -33,5 +61,6 @@ public:
     
     PerformanceMetrics getPerformanceMetrics(double clock_frequency_hz) const;
 };
+
 
 } // namespace perf_model

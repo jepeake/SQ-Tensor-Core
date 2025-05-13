@@ -2,7 +2,19 @@
 #include <vector>
 #include <cstdint>
 
+
+//  ███████████  ███  ████          
+// ░█░░░███░░░█ ░░░  ░░███          
+// ░   ░███  ░  ████  ░███   ██████ 
+//     ░███    ░░███  ░███  ███░░███
+//     ░███     ░███  ░███ ░███████ 
+//     ░███     ░███  ░███ ░███░░░  
+//     █████    █████ █████░░██████ 
+//    ░░░░░    ░░░░░ ░░░░░  ░░░░░░  
+
+
 namespace perf_model {
+
 
 template<typename T>
 struct Tile {
@@ -12,6 +24,7 @@ struct Tile {
     
     Tile() : rows(0), cols(0) {}
     Tile(size_t r, size_t c) : rows(r), cols(c), data(r * c) {}
+    Tile(size_t r, size_t c, T init_val) : rows(r), cols(c), data(r * c, init_val) {}
     
     T& at(size_t row, size_t col) {
         return data[row * cols + col];
@@ -21,5 +34,6 @@ struct Tile {
         return data[row * cols + col];
     }
 };
+
 
 } // namespace perf_model
