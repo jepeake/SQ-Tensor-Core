@@ -1,5 +1,3 @@
-
-
 //  ███████████                                                        ███                     
 // ░░███░░░░░███                                                      ░░░                      
 //  ░███    ░███ ████████   ██████   ██████   ██████   █████   █████  ████  ████████    ███████
@@ -32,11 +30,15 @@
 // Processing Element
 // ==================
 module processing_element #(
-    parameter TILE_SIZE        = 2,             // Size of Input Tiles (NxN)
-    parameter ACT_WIDTH        = 8,             // Width of Activation Values (int8_t)
-    parameter WEIGHT_WIDTH     = 1,             // Width of Weight Values (Bits)
-    parameter NUM_BIT_PLANES   = 4,             // Number of Weight Bit Planes
-    parameter RESULT_WIDTH     = 16             // Width of Output Values (int16_t)
+    parameter int TILE_SIZE        = 2,             // Size of Input Tiles (NxN)
+    parameter int ACT_WIDTH        = 8,             // Width of Activation Values (int8_t)
+    parameter int WEIGHT_WIDTH     = 1,             // Width of Weight Values (Bits)
+    parameter int NUM_BIT_PLANES   = 4,             // Number of Weight Bit Planes
+    parameter int RESULT_WIDTH     = 16,            // Width of Output Values (int16_t)
+    
+    parameter type ACTIVATION_T    = logic signed [ACT_WIDTH-1:0],
+    parameter type WEIGHT_T        = logic [WEIGHT_WIDTH-1:0],
+    parameter type RESULT_T        = logic signed [RESULT_WIDTH-1:0]
 )(
     // Control Signals
     input  logic                                  clk,
@@ -45,14 +47,14 @@ module processing_element #(
     output logic                                  done,
     
     // Configuration
-    input  logic signed [ACT_WIDTH-1:0]           activation_threshold,
+    input  ACTIVATION_T                           activation_threshold,
     
     // Input Data
-    input  logic [WEIGHT_WIDTH-1:0]               weight_tiles[NUM_BIT_PLANES][TILE_SIZE][TILE_SIZE],
-    input  logic signed [ACT_WIDTH-1:0]           activation_tile[TILE_SIZE][TILE_SIZE],
+    input  WEIGHT_T                               weight_tiles[NUM_BIT_PLANES][TILE_SIZE][TILE_SIZE],
+    input  ACTIVATION_T                           activation_tile[TILE_SIZE][TILE_SIZE],
     
     // Output Data
-    output logic signed [RESULT_WIDTH-1:0]        result_tile[TILE_SIZE][TILE_SIZE]
+    output RESULT_T                               result_tile[TILE_SIZE][TILE_SIZE]
 );
 
     // State Definitions
@@ -68,13 +70,13 @@ module processing_element #(
     
     // Matrices of Gated and Shifted Contributions for Each Bit Plane
     // Format: [bit_plane][i_row][j_col][k_idx]
-    logic signed [RESULT_WIDTH-1:0] contributions[NUM_BIT_PLANES][TILE_SIZE][TILE_SIZE][TILE_SIZE];
+    RESULT_T contributions[NUM_BIT_PLANES][TILE_SIZE][TILE_SIZE][TILE_SIZE];
     
     // Input Validity Tracking for Sparse Activation Skipping
     logic [NUM_BIT_PLANES-1:0][TILE_SIZE-1:0][TILE_SIZE-1:0][TILE_SIZE-1:0] contrib_valid;
     
     // Final Output Results
-    logic signed [RESULT_WIDTH-1:0] final_results[TILE_SIZE][TILE_SIZE];
+    RESULT_T final_results[TILE_SIZE][TILE_SIZE];
     
     // Phase Trackers
     logic gate_shift_done;
@@ -107,8 +109,8 @@ module processing_element #(
                         for (int k = 0; k < TILE_SIZE; k++) begin
                             // Check Activation Sparsity
                             logic is_sparse;
-                            logic signed [ACT_WIDTH-1:0] act_value;
-                            logic weight_value;
+                            ACTIVATION_T act_value;
+                            WEIGHT_T weight_value;
                             
                             act_value = activation_tile[i][k];
                             weight_value = weight_tiles[b][k][j];
@@ -119,7 +121,7 @@ module processing_element #(
                             
                             if (weight_value == 1'b1 && !is_sparse) begin
                                 // Valid Contribution: Gate and Shift in One Step
-                                logic signed [RESULT_WIDTH-1:0] shifted_value;
+                                RESULT_T shifted_value;
                                 shifted_value = $signed({{(RESULT_WIDTH-ACT_WIDTH){act_value[ACT_WIDTH-1]}}, act_value}) << b;
                                 
                                 contributions[b][i][j][k] <= shifted_value;
@@ -163,7 +165,7 @@ module processing_element #(
             // Fully Parallel Direct Sum for All Output Elements
             for (int i = 0; i < TILE_SIZE; i++) begin
                 for (int j = 0; j < TILE_SIZE; j++) begin
-                    logic signed [RESULT_WIDTH-1:0] sum_total;
+                    RESULT_T sum_total;
                     sum_total = '0;
                     
                     // Sum across all k values and bit planes in parallel
@@ -244,8 +246,49 @@ module processing_element #(
                     done <= 1'b1;
                     $display("DONE: Processing Complete in %0d cycles", total_cycles);
                 end
+                
+                default: begin
+                    state <= IDLE;
+                    $display("STATE: Invalid State Detected, Returning to IDLE");
+                end
             endcase
         end
     end
+
+endmodule
+
+// ======================
+// Top Processing Element
+// ======================
+module top_processing_element (
+    input  logic                                  clk,
+    input  logic                                  rst_n,
+    input  logic                                  start,
+    output logic                                  done,
+    
+    input  logic signed [7:0]                     activation_threshold,
+    
+    input  logic [0:0]                            weight_tiles[4][4][4],
+    input  logic signed [7:0]                     activation_tile[4][4],
+    
+    output logic signed [31:0]                    result_tile[4][4]
+);
+
+    processing_element #(
+        .TILE_SIZE(4),           // 4x4 tiles
+        .ACT_WIDTH(8),           // 8-bit activations
+        .WEIGHT_WIDTH(1),        // 1-bit weights (per bit plane)
+        .NUM_BIT_PLANES(4),      // 4 bit planes (for 4-bit weights)
+        .RESULT_WIDTH(32)        // 32-bit results
+    ) pe_inst (
+        .clk(clk),
+        .rst_n(rst_n),
+        .start(start),
+        .done(done),
+        .activation_threshold(activation_threshold),
+        .weight_tiles(weight_tiles),
+        .activation_tile(activation_tile),
+        .result_tile(result_tile)
+    );
 
 endmodule
