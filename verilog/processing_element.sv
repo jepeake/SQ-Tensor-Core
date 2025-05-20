@@ -60,11 +60,9 @@ module processing_element #(
 );
 
     // State Definitions
-    typedef enum logic [2:0] {
+    typedef enum logic [1:0] {
         IDLE,                // Waiting for Start Signal
-        GATE_AND_SHIFT,      // Single Cycle for Gating and Shifting Across All Bit Planes
-        SUM_ALL,             // Single Cycle to Sum All Contributions for All Output Elements
-        STORE_RESULTS,       // Single Cycle to Store Results
+        COMPUTE,             // Single Cycle Computation (combines all operations)
         DONE_STATE           // Processing Complete
     } pe_state_t;
     
@@ -77,115 +75,9 @@ module processing_element #(
     // Input Validity Tracking for Sparse Activation Skipping
     logic [NUM_BIT_PLANES-1:0][TILE_SIZE-1:0][TILE_SIZE-1:0][TILE_SIZE-1:0] contrib_valid;
     
-    // Final Output Results
-    RESULT_T final_results[TILE_SIZE][TILE_SIZE];
-    
-    // Phase Trackers
-    logic gate_shift_done;
-    
     // Counter for Total Cycles
     logic [31:0] total_cycles;
     
-    // =========================
-    // PHASE 1: Gate and Shift  
-    // =========================
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            gate_shift_done <= 1'b0;
-            
-            for (int b = 0; b < NUM_BIT_PLANES; b++) begin
-                for (int i = 0; i < TILE_SIZE; i++) begin
-                    for (int j = 0; j < TILE_SIZE; j++) begin
-                        for (int k = 0; k < TILE_SIZE; k++) begin
-                            contributions[b][i][j][k] <= '0;
-                            contrib_valid[b][i][j][k] <= 1'b0;
-                        end
-                    end
-                end
-            end
-        end else if (state == GATE_AND_SHIFT) begin
-
-            for (int b = 0; b < NUM_BIT_PLANES; b++) begin
-                for (int i = 0; i < TILE_SIZE; i++) begin
-                    for (int j = 0; j < TILE_SIZE; j++) begin
-                        for (int k = 0; k < TILE_SIZE; k++) begin
-                            // Check Activation Sparsity
-                            logic is_sparse;
-                            ACTIVATION_T act_value;
-                            WEIGHT_T weight_value;
-                            
-                            act_value = activation_tile[i][k];
-                            weight_value = weight_tiles[b][k][j];
-                            
-                            // Check If Activation Should Be Treated as Zero (Sparse)
-                            is_sparse = ($signed(act_value) <= activation_threshold) && 
-                                        ($signed(act_value) >= -activation_threshold);
-                            
-                            if (weight_value == 1'b1 && !is_sparse) begin
-                                // Valid Contribution: Gate and Shift in One Step
-                                RESULT_T shifted_value;
-                                shifted_value = $signed({{(RESULT_WIDTH-ACT_WIDTH){act_value[ACT_WIDTH-1]}}, act_value}) << b;
-                                
-                                contributions[b][i][j][k] <= shifted_value;
-                                contrib_valid[b][i][j][k] <= 1'b1;
-                                
-                                $display("GATE+SHIFT: BP%0d [i=%0d,j=%0d,k=%0d]: act=%0d, shifted=%0d", 
-                                         b, i, j, k, act_value, shifted_value);
-                            end else begin
-                                // No Contribution Due to Weight=0 or Sparse Activation
-                                contributions[b][i][j][k] <= '0;
-                                contrib_valid[b][i][j][k] <= 1'b0;
-                                
-                                if (is_sparse) begin
-                                    $display("GATE+SHIFT: BP%0d [i=%0d,j=%0d,k=%0d]: sparse activation skipped", 
-                                             b, i, j, k);
-                                end else if (weight_value == 1'b0) begin
-                                    $display("GATE+SHIFT: BP%0d [i=%0d,j=%0d,k=%0d]: weight=0, skipped", 
-                                             b, i, j, k);
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-            gate_shift_done <= 1'b1;
-            $display("GATE+SHIFT: Complete");
-        end
-    end
-    
-    // ==================================
-    // PHASE 2: Direct Parallel Summation
-    // ==================================
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            for (int i = 0; i < TILE_SIZE; i++) begin
-                for (int j = 0; j < TILE_SIZE; j++) begin
-                    final_results[i][j] <= '0;
-                end
-            end
-        end else if (state == SUM_ALL) begin
-            // Fully Parallel Direct Sum for All Output Elements
-            for (int i = 0; i < TILE_SIZE; i++) begin
-                for (int j = 0; j < TILE_SIZE; j++) begin
-                    RESULT_T sum_total;
-                    sum_total = '0;
-                    
-                    // Sum across all k values and bit planes in parallel
-                    for (int k = 0; k < TILE_SIZE; k++) begin
-                        for (int b = 0; b < NUM_BIT_PLANES; b++) begin
-                            if (contrib_valid[b][i][j][k]) begin
-                                sum_total = sum_total + contributions[b][i][j][k];
-                            end
-                        end
-                    end
-                    
-                    final_results[i][j] <= sum_total;
-                    $display("DIRECT SUM: result_tile[%0d][%0d] = %0d", i, j, sum_total);
-                end
-            end
-        end
-    end
-
     // ==============
     // State Machine
     // ==============
@@ -195,7 +87,7 @@ module processing_element #(
             done <= 1'b0;
             total_cycles <= '0;
             
-            // Clear Output Registers1
+            // Clear Output Registers
             for (int i = 0; i < TILE_SIZE; i++) begin
                 for (int j = 0; j < TILE_SIZE; j++) begin
                     result_tile[i][j] <= '0;
@@ -211,47 +103,58 @@ module processing_element #(
             case (state)
                 IDLE: begin
                     if (start) begin
-                        state <= GATE_AND_SHIFT;
-                        $display("STATE: Starting Processing Element");
-                    
-                        // Reset Counters and Flags
-                        gate_shift_done <= 1'b0;
+                        // Move to single compute state
+                        state <= COMPUTE;
+                        done <= 1'b0;  // Clear done flag when starting
                         total_cycles <= '0;
                     end
                 end
                 
-                GATE_AND_SHIFT: begin
-                    if (gate_shift_done) begin
-                        state <= SUM_ALL;
-                        $display("STATE: Gate+Shift Complete, Starting Summation");
-                    end
-                end
-                
-                SUM_ALL: begin
-                    state <= STORE_RESULTS;
-                    $display("STATE: Summation Complete");
-                end
-                
-                STORE_RESULTS: begin
+                COMPUTE: begin
+                    // Perform all computations in a single cycle, and directly update output registers
                     for (int i = 0; i < TILE_SIZE; i++) begin
                         for (int j = 0; j < TILE_SIZE; j++) begin
-                            result_tile[i][j] <= final_results[i][j];
-                            $display("STORE: result_tile[%0d][%0d] = %0d", i, j, final_results[i][j]);
+                            RESULT_T sum_total;
+                            sum_total = '0;
+                            
+                            // Immediately compute the results based on inputs
+                            for (int k = 0; k < TILE_SIZE; k++) begin
+                                for (int b = 0; b < NUM_BIT_PLANES; b++) begin
+                                    ACTIVATION_T act_value = activation_tile[i][k];
+                                    WEIGHT_T weight_value = weight_tiles[b][k][j];
+                                    
+                                    logic is_sparse = ($signed(act_value) <= activation_threshold) && 
+                                                      ($signed(act_value) >= -activation_threshold);
+                                    
+                                    if (weight_value == 1'b1 && !is_sparse) begin
+                                        RESULT_T shifted_value;
+                                        shifted_value = $signed({{(RESULT_WIDTH-ACT_WIDTH){act_value[ACT_WIDTH-1]}}, act_value}) << b;
+                                        sum_total = $signed(sum_total) + $signed(shifted_value);
+                                    end
+                                end
+                            end
+                            
+                            // Directly update output register (bypass final_results)
+                            result_tile[i][j] <= sum_total;
                         end
                     end
                     
+                    // Move directly to done state
                     state <= DONE_STATE;
-                    $display("STATE: Results Stored, Moving to DONE");
                 end
                 
                 DONE_STATE: begin
                     done <= 1'b1;
-                    $display("DONE: Processing Complete in %0d cycles", total_cycles);
+                    // Stay in DONE_STATE until next start signal
+                    if (start) begin
+                        state <= COMPUTE;
+                        done <= 1'b0;
+                        total_cycles <= '0;
+                    end
                 end
                 
                 default: begin
                     state <= IDLE;
-                    $display("STATE: Invalid State Detected, Returning to IDLE");
                 end
             endcase
         end
