@@ -1,1 +1,1 @@
-# Sparse-Quantised Tensor Core
+# _Sparse-Elastic Neural Network Accelerator_
